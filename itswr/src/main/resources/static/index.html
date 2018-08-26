@@ -231,7 +231,7 @@ function clock() {
 		} else {
 			var value = (response.success + response.failure) / response.total;
 			$("#progress-bar").css("width", value * 100 + "%").attr("aria-valuenow", value * 10000);
-			$.log(value);
+			$.log(response.status, response.total, response.success, response.failure, value);
 		}
 	}, function() {
 		$.msg.error("请稍后重试或联系系统管理员解决", "系统异常");

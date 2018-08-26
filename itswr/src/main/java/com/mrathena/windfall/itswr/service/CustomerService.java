@@ -72,6 +72,25 @@ public class CustomerService {
 			if (!matcher.matches()) {
 				return "起始CD号的格式应该为[CDxxxxxxx]";
 			}
+
+			// 获取从startNo开始总计count个数据中成功的数据
+			List<Customer> tempCustomerList = mapper.selectByStartNoAndCount(startNo, count);
+			Map<String, Customer> tempCustomerMap = tempCustomerList.stream()
+					.collect(Collectors.toMap(Customer::getNo, customer -> customer));
+			long successCount = tempCustomerList.stream().filter(item -> "SUCCESS".equals(item.getStatus())).count();
+			if (successCount == tempCustomerList.size()) {
+				return "任务执行结束";
+			}
+			progress.setSuccess(successCount);
+			context.setAttribute(PROGRESS, progress);
+
+			// 生成no集合
+			List<String> noList = new ArrayList<>(count);
+			int start = Integer.parseInt(startNo.substring(2));
+			for (int i = 0; i < count; i++) {
+				noList.add(CD + (start + i));
+			}
+
 			// 获取itswr账号密码
 			String username = env.getProperty("itswr.username");
 			String password = env.getProperty("itswr.password");
@@ -79,20 +98,6 @@ public class CustomerService {
 			boolean success = authenticate(username, password, context, progress);
 			if (!success) {
 				return "Itswr网站鉴权失败";
-			}
-
-			// 获取从startNo开始总计count个数据中成功的数据
-			List<Customer> tempCustomerList = mapper.selectByStartNoAndCount(startNo, count);
-			Map<String, Customer> tempCustomerMap = tempCustomerList.stream()
-					.collect(Collectors.toMap(Customer::getNo, customer -> customer));
-			progress.setSuccess(tempCustomerMap.size());
-			context.setAttribute(PROGRESS, progress);
-
-			// 生成no集合
-			List<String> noList = new ArrayList<>(count);
-			int start = Integer.parseInt(startNo.substring(2));
-			for (int i = 0; i <= count; i++) {
-				noList.add(CD + (start + i));
 			}
 
 			// 开100个线程遍历获取信息
@@ -151,8 +156,7 @@ public class CustomerService {
 			do { //等待所有任务完成
 				loop = !executor.awaitTermination(1, TimeUnit.SECONDS); //阻塞，直到线程池里所有任务结束
 			} while (loop);
-			progress.setStatus("结束");
-			context.setAttribute(PROGRESS, progress);
+			log.info("任务执行结束");
 			return "任务执行结束";
 		} catch (Exception e) {
 			log.error("", e);
@@ -260,6 +264,7 @@ public class CustomerService {
 			parameters.put("prometricTestingId", id);
 			response = OkHttpKit.post(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1")
 					.json(JSON.toJSONString(parameters)).execute2();
+			log.info(response);
 			String arguement = JSON.parseObject(response).getJSONArray("r").getJSONObject(0).getString("i");
 			// 获取信息
 			url = "https://itswr.prometric.com/SiteScheduler/Default.aspx";
