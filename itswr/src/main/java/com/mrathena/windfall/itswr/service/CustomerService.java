@@ -108,6 +108,7 @@ public class CustomerService {
 							long end = System.currentTimeMillis();
 							log.info("执行:结束:成功:[{}]:{}", id, end - start);
 							progress.getSuccess().add(id);
+							progress.setCount(progress.getCount() + 1);
 							context.setAttribute(PROGRESS, progress);
 							return;
 						}
@@ -280,12 +281,12 @@ public class CustomerService {
 					JSONObject object = JSON.parseObject(line);
 					JSONObject data = object.getJSONObject("data");
 					if (data == null) {
-						log.info("[{}]失败原因:object中不包含data", id.toUpperCase());
+						log.info("    [{}]失败原因:object中不包含data", id.toUpperCase());
 						return customer;
 					}
 					JSONObject info = data.getJSONObject("i");
 					if (info == null) {
-						log.info("[{}]失败原因:data中不包含i", id.toUpperCase());
+						log.info("    [{}]失败原因:data中不包含i", id.toUpperCase());
 						return customer;
 					}
 					customer.setStatus("SUCCESS");
@@ -302,10 +303,10 @@ public class CustomerService {
 					return customer;
 				}
 			}
-			log.info("[{}]失败原因:结果中不包含object", id.toUpperCase());
+			log.info("    [{}]失败原因:结果中不包含object", id.toUpperCase());
 			return customer;
 		} catch (Exception e) {
-			log.info("[{}]失败原因:{}", id.toUpperCase(), e.getMessage());
+			log.info("    [{}]失败原因:{}", id.toUpperCase(), e.getMessage());
 			return customer;
 		}
 	}
