@@ -142,7 +142,7 @@ public class CustomerService {
 						long end = System.currentTimeMillis();
 						progress.setCount(progress.getCount() + 1);
 						context.setAttribute(PROGRESS, progress);
-						log.info("执行:结束:{}:[{}]:{}", success ? "成功" : "失败", id.toUpperCase(), end - start);
+						log.info("执行:结束:{}:[{}]:{}ms", success ? "成功" : "失败", id.toUpperCase(), end - start);
 					}
 				});
 			}
