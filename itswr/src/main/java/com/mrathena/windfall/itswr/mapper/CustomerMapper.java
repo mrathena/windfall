@@ -28,8 +28,10 @@ public interface CustomerMapper {
 	/** itswr_customer */
 	int updateByPrimaryKey(Customer record);
 
-	List<Customer> select(@Param("startNo") String startNo);
+	List<Customer> selectByStartNo(@Param("startNo") String startNo);
 
 	Customer selectByNo(@Param("no") String no);
+
+	List<Customer> selectByStartNoAndCount(@Param("startNo") String startNo, @Param("count") int count);
 
 }

@@ -1,15 +1,15 @@
 package com.mrathena.windfall.itswr.service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import javax.servlet.ServletContext;
 
@@ -39,8 +39,6 @@ public class CustomerService {
 	private static final String CD = "CD";
 	private static final String UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0";
 
-	private Lock lock = new ReentrantLock();
-
 	@Autowired
 	private Environment env;
 
@@ -56,7 +54,6 @@ public class CustomerService {
 		Progress progress = new Progress("初始化", count);
 		context.setAttribute(PROGRESS, progress);
 		try {
-			lock.lock();
 			// 参数校验
 			if (startNo == null || startNo.isEmpty()) {
 				return "起始CD号的格式应该为[CDxxxxxxx]";
@@ -75,11 +72,6 @@ public class CustomerService {
 			if (!matcher.matches()) {
 				return "起始CD号的格式应该为[CDxxxxxxx]";
 			}
-			int start = Integer.parseInt(startNo.substring(2));
-			int stop = start + count - 1;
-			progress.setStartNo(CD + start);
-			progress.setStopNo(CD + stop);
-			context.setAttribute(PROGRESS, progress);
 			// 获取itswr账号密码
 			String username = env.getProperty("itswr.username");
 			String password = env.getProperty("itswr.password");
@@ -88,64 +80,72 @@ public class CustomerService {
 			if (!success) {
 				return "Itswr网站鉴权失败";
 			}
+
+			// 获取从startNo开始总计count个数据中成功的数据
+			List<Customer> tempCustomerList = mapper.selectByStartNoAndCount(startNo, count);
+			Map<String, Customer> tempCustomerMap = tempCustomerList.stream()
+					.collect(Collectors.toMap(Customer::getNo, customer -> customer));
+			progress.setSuccess(tempCustomerMap.size());
+			context.setAttribute(PROGRESS, progress);
+
+			// 生成no集合
+			List<String> noList = new ArrayList<>(count);
+			int start = Integer.parseInt(startNo.substring(2));
+			for (int i = 0; i <= count; i++) {
+				noList.add(CD + (start + i));
+			}
+
 			// 开100个线程遍历获取信息
 			ExecutorService executor = Executors.newFixedThreadPool(100);
-			for (int i = 0; i <= stop - start; i++) {
-				int index = start + i;
+			noList.forEach(no -> {
+				Customer tempCustomer = tempCustomerMap.get(no);
+				if (tempCustomer == null || "FAILURE".equals(tempCustomer.getStatus())) {
+					// 不存在或失败
+					progress.setStatus("执行中");
+					context.setAttribute(PROGRESS, progress);
+					executor.submit(new Runnable() {
+						@Override
+						public void run() {
 
-				progress.setStatus("执行中");
-				context.setAttribute(PROGRESS, progress);
-				// 获取信息
-				String id = CD + index;
-				executor.submit(new Runnable() {
-					@Override
-					public void run() {
-
-						long start = System.currentTimeMillis();
-						log.info("执行:开始:[{}],({},{})", id, progress.getStartNo(), progress.getStopNo());
-						Customer oldCustomer = mapper.selectByNo(id);
-						if (oldCustomer != null && "SUCCESS".equals(oldCustomer.getStatus())) {
-							long end = System.currentTimeMillis();
-							log.info("执行:结束:成功:[{}]:{}", id, end - start);
-							progress.getSuccess().add(id);
-							progress.setCount(progress.getCount() + 1);
-							context.setAttribute(PROGRESS, progress);
-							return;
-						}
-						// oldCustomer 没有/有但失败
-						int counter = 1;
-						Customer customer = getCustomer(id);
-						while (counter < 10 && "FAILURE".equals(customer.getStatus())) {
-							log.info("执行:失败:[{}],第{}次重试", id.toUpperCase(), counter);
-							counter++;
-							customer = getCustomer(id);
-						}
-						boolean success;
-						if ("SUCCESS".equals(customer.getStatus())) {
-							success = true;
-							progress.getSuccess().add(id);
-							context.setAttribute(PROGRESS, progress);
-							if (oldCustomer == null) {
-								mapper.insertSelective(customer);
+							long start = System.currentTimeMillis();
+							log.info("开始:[{}]", no);
+							// 重试计数器
+							int counter = 1;
+							Customer customer = getCustomer(no);
+							while (counter < 10 && "FAILURE".equals(customer.getStatus())) {
+								log.info("    失败:[{}],第{}次重试", no.toUpperCase(), counter);
+								counter++;
+								customer = getCustomer(no);
+							}
+							boolean success;
+							if ("SUCCESS".equals(customer.getStatus())) {
+								// 执行成功
+								success = true;
+								progress.setSuccess(progress.getSuccess() + 1);
+								if (tempCustomer == null) {
+									// 不存在
+									mapper.insertSelective(customer);
+								} else {
+									// 已存在但失败
+									customer.setId(tempCustomer.getId());
+									mapper.updateByPrimaryKeySelective(customer);
+								}
 							} else {
-								customer.setId(oldCustomer.getId());
-								mapper.updateByPrimaryKeySelective(customer);
+								// 执行失败
+								success = false;
+								progress.setFailure(progress.getFailure() + 1);
+								if (tempCustomer == null) {
+									// 不存在
+									mapper.insertSelective(customer);
+								}
 							}
-						} else {
-							success = false;
-							progress.getFailure().add(id);
 							context.setAttribute(PROGRESS, progress);
-							if (oldCustomer == null) {
-								mapper.insertSelective(customer);
-							}
+							long end = System.currentTimeMillis();
+							log.info("结束:{}:[{}]:{}ms", success ? "成功" : "失败", no.toUpperCase(), end - start);
 						}
-						long end = System.currentTimeMillis();
-						progress.setCount(progress.getCount() + 1);
-						context.setAttribute(PROGRESS, progress);
-						log.info("执行:结束:{}:[{}]:{}ms", success ? "成功" : "失败", id.toUpperCase(), end - start);
-					}
-				});
-			}
+					});
+				}
+			});
 			executor.shutdown();
 			boolean loop = true;
 			do { //等待所有任务完成
@@ -158,8 +158,6 @@ public class CustomerService {
 			log.error("", e);
 			return "任务执行失败";
 		} finally {
-			lock.unlock();
-			// 移除标记
 			context.removeAttribute(PROGRESS);
 		}
 	}
@@ -174,7 +172,7 @@ public class CustomerService {
 
 	public DataTables.Result<Customer> query(DataTables dt, String startNo) {
 		PageHelper.startPage(dt.getIndex(), dt.getSize());
-		List<Customer> customerList = mapper.select(startNo);
+		List<Customer> customerList = mapper.selectByStartNo(startNo);
 		PageInfo<Customer> page = new PageInfo<>(customerList);
 		return new DataTables.Result<>(dt.getDraw(), page.getList(), page.getTotal(), page.getTotal());
 	}
@@ -237,18 +235,32 @@ public class CustomerService {
 		customer.setNo(id);
 		customer.setStatus("FAILURE");
 		try {
+
 			// search页面
 			String url = "https://itswr.prometric.com/SiteScheduler/Default.aspx";
-			String responseStr = OkHttpKit.get(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1").execute2();
-			Document document = Jsoup.parse(responseStr);
+			String response = OkHttpKit.get(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1").execute2();
+			Document document = Jsoup.parse(response);
+
+			// 选择结点(CN52N)
+			url = "https://itswr.prometric.com/SiteScheduler/Default.aspx";
+			Map<String, Object> parameters = new HashMap<>();
+			parameters.put("__EVENTARGUMENT", "click-0");
+			parameters.put("__EVENTTARGET", "ctl00$_HeaderPlaceHolder$siteDropdown");
+			parameters.put("__EVENTVALIDATION", document.getElementById("__EVENTVALIDATION").val());
+			parameters.put("__VIEWSTATE", document.getElementById("__VIEWSTATE").val());
+			parameters.put("__VIEWSTATEENCRYPTED", document.getElementById("__VIEWSTATEENCRYPTED").val());
+			parameters.put("ctl00$hdnInput", document.getElementById("hdnInput").val());
+			response = OkHttpKit.post(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1").parameters(parameters)
+					.execute2();
+			document = Jsoup.parse(response);
 
 			// 获取信息(prometricTestingId对应的key(会变))
 			url = "https://itswr.prometric.com/SiteScheduler/Services/SearchService.svc/TestingID/";
-			Map<String, Object> parameters = new HashMap<>();
+			parameters.clear();
 			parameters.put("prometricTestingId", id);
-			responseStr = OkHttpKit.post(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1")
+			response = OkHttpKit.post(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1")
 					.json(JSON.toJSONString(parameters)).execute2();
-			String arguement = JSON.parseObject(responseStr).getJSONArray("r").getJSONObject(0).getString("i");
+			String arguement = JSON.parseObject(response).getJSONArray("r").getJSONObject(0).getString("i");
 			// 获取信息
 			url = "https://itswr.prometric.com/SiteScheduler/Default.aspx";
 			parameters.clear();
@@ -269,10 +281,10 @@ public class CustomerService {
 			parameters.put("ctl00$_ContentPlaceHolder$searchByList", "TestingID");
 			parameters.put("ctl00$hdnInput", document.getElementById("hdnInput").val());
 			parameters.put("sortByCriteria", "name");
-			responseStr = OkHttpKit.post(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1")
-					.parameters(parameters).execute2();
+			response = OkHttpKit.post(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1").parameters(parameters)
+					.execute2();
 
-			String[] lines = responseStr.split(System.lineSeparator());
+			String[] lines = response.split(System.lineSeparator());
 			for (int i = 0; i < lines.length; i++) {
 				String line = lines[i];
 				if (line.contains("var a")) {
@@ -307,6 +319,7 @@ public class CustomerService {
 			return customer;
 		} catch (Exception e) {
 			log.info("    [{}]失败原因:{}", id.toUpperCase(), e.getMessage());
+			log.error("", e);
 			return customer;
 		}
 	}

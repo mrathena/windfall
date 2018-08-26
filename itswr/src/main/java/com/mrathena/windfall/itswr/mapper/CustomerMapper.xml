@@ -108,7 +108,7 @@
 		from itswr_customer
 		where id = #{id,jdbcType=BIGINT}
 	</select>
-	<select id="select" parameterType="java.util.Map" resultMap="BaseResultMap">
+	<select id="selectByStartNo" parameterType="java.util.Map" resultMap="BaseResultMap">
 		select 
 		<include refid="Base_Column_List" />
 		from itswr_customer
@@ -124,5 +124,12 @@
 		<include refid="Base_Column_List" />
 		from itswr_customer
 		where no = #{no}
+	</select>
+	<select id="selectByStartNoAndCount" parameterType="java.util.Map" resultMap="BaseResultMap">
+		select 
+		<include refid="Base_Column_List" />
+		from itswr_customer
+		where no &gt;= #{startNo}
+		limit #{count}
 	</select>
 </mapper>
