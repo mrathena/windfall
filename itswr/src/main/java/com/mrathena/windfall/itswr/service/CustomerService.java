@@ -105,7 +105,9 @@ public class CustomerService {
 						Customer oldCustomer = mapper.selectByNo(id);
 						if (oldCustomer != null && "SUCCESS".equals(oldCustomer.getStatus())) {
 							long end = System.currentTimeMillis();
-							log.info("执行:结束:[{}]:{}", id, end - start);
+							log.info("执行:结束:成功:[{}]:{}", id, end - start);
+							progress.getSuccess().add(id);
+							context.setAttribute(PROGRESS, progress);
 							return;
 						}
 						// oldCustomer 没有/有但失败
@@ -116,8 +118,9 @@ public class CustomerService {
 							counter++;
 							customer = getCustomer(id);
 						}
+						boolean success;
 						if ("SUCCESS".equals(customer.getStatus())) {
-							log.info("执行:成功:[{}]", id.toUpperCase());
+							success = true;
 							progress.getSuccess().add(id);
 							context.setAttribute(PROGRESS, progress);
 							if (oldCustomer == null) {
@@ -127,7 +130,7 @@ public class CustomerService {
 								mapper.updateByPrimaryKeySelective(customer);
 							}
 						} else {
-							log.info("执行:失败:[{}]", id.toUpperCase());
+							success = false;
 							progress.getFailure().add(id);
 							context.setAttribute(PROGRESS, progress);
 							if (oldCustomer == null) {
@@ -135,7 +138,7 @@ public class CustomerService {
 							}
 						}
 						long end = System.currentTimeMillis();
-						log.info("执行:结束:[{}]:{}", id, end - start);
+						log.info("执行:结束:{}:[{}]:{}", success ? "成功" : "失败", id.toUpperCase(), end - start);
 					}
 				});
 			}
@@ -146,7 +149,7 @@ public class CustomerService {
 			} while (loop);
 			progress.setStatus("结束");
 			context.setAttribute(PROGRESS, progress);
-			return "任务执行成功";
+			return "任务执行结束";
 		} catch (Exception e) {
 			log.error("", e);
 			return "任务执行失败";
@@ -280,12 +283,13 @@ public class CustomerService {
 					line = line.substring(0, line.length() - 1);
 					JSONObject object = JSON.parseObject(line);
 					JSONObject data = object.getJSONObject("data");
-					log.info("[{}]:{}", id.toUpperCase(), line);
 					if (data == null) {
+						log.info("[{}]失败原因:结果中不包含data", id.toUpperCase());
 						return customer;
 					}
 					JSONObject info = data.getJSONObject("i");
 					if (info == null) {
+						log.info("[{}]失败原因:data中不包含i", id.toUpperCase());
 						return customer;
 					}
 					customer.setStatus("SUCCESS");
@@ -304,7 +308,7 @@ public class CustomerService {
 			}
 			return customer;
 		} catch (Exception e) {
-			log.error("", e);
+			log.info("[{}]失败原因:{}", id.toUpperCase(), e.getMessage());
 			return customer;
 		}
 	}
