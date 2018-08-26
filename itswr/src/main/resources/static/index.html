@@ -229,9 +229,9 @@ function clock() {
 			handle = window.clearInterval(handle);
 			$("#progress").hide();
 		} else {
-			var value = (response.success + response.failure) /response.total;
+			var value = (response.success + response.failure) / response.total;
 			$("#progress-bar").css("width", value * 100 + "%").attr("aria-valuenow", value * 10000);
-			$.log(response.status, response.count/response.total*1000);
+			$.log(value);
 		}
 	}, function() {
 		$.msg.error("请稍后重试或联系系统管理员解决", "系统异常");
