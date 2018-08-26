@@ -1,0 +1,18 @@
+/* th,td不换行 */
+th, td {
+	white-space: nowrap !important;
+}
+
+/* 滚动条宽度变细 */
+::-webkit-scrollbar {
+	width: 4px;
+}
+
+::-webkit-scrollbar:horizontal {
+	height: 4px;
+}
+
+/* 重置layer按钮样式 */
+body .demo-class .layui-layer-btn .layui-layer-btn0 {
+	background: #999;
+}
