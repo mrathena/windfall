@@ -12,6 +12,11 @@ import lombok.ToString;
 @ToString
 public class Progress {
 
+	// 总数
+	private long total;
+	// 当前已结束数量
+	private long count;
+
 	private String startNo;
 	private String stopNo;
 	private String status;
@@ -21,6 +26,11 @@ public class Progress {
 
 	public Progress(String status) {
 		this.status = status;
+	}
+
+	public Progress(String status, long total) {
+		this.status = status;
+		this.total = total;
 	}
 
 }

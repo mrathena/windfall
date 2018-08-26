@@ -1,6 +1,5 @@
 package com.mrathena.windfall.itswr.service;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +22,8 @@ import org.springframework.stereotype.Service;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
+import com.mrathena.windfall.itswr.bo.DataTables;
 import com.mrathena.windfall.itswr.bo.Progress;
 import com.mrathena.windfall.itswr.entity.Customer;
 import com.mrathena.windfall.itswr.mapper.CustomerMapper;
@@ -52,7 +53,7 @@ public class CustomerService {
 		if (flag != null) {
 			return "有一个爬取任务正在进行中, 请在其爬取结束后再开启新的爬取任务";
 		}
-		Progress progress = new Progress("初始化");
+		Progress progress = new Progress("初始化", count);
 		context.setAttribute(PROGRESS, progress);
 		try {
 			lock.lock();
@@ -138,6 +139,8 @@ public class CustomerService {
 							}
 						}
 						long end = System.currentTimeMillis();
+						progress.setCount(progress.getCount() + 1);
+						context.setAttribute(PROGRESS, progress);
 						log.info("执行:结束:{}:[{}]:{}", success ? "成功" : "失败", id.toUpperCase(), end - start);
 					}
 				});
@@ -168,18 +171,11 @@ public class CustomerService {
 		return (Progress) flag;
 	}
 
-	public List<Customer> query(String startNo, Integer size, Integer index) {
-		if (startNo != null && startNo.isEmpty()) {
-			return new ArrayList<>();
-		}
-		if (size == null || size < 10) {
-			size = 10;
-		}
-		if (index == null || index < 1) {
-			index = 1;
-		}
-		PageHelper.startPage(index, size);
-		return mapper.select(startNo);
+	public DataTables.Result<Customer> query(DataTables dt, String startNo) {
+		PageHelper.startPage(dt.getIndex(), dt.getSize());
+		List<Customer> customerList = mapper.select(startNo);
+		PageInfo<Customer> page = new PageInfo<>(customerList);
+		return new DataTables.Result<>(dt.getDraw(), page.getList(), page.getTotal(), page.getTotal());
 	}
 
 	private boolean authenticate(String username, String password, ServletContext context, Progress progress) {
@@ -284,7 +280,7 @@ public class CustomerService {
 					JSONObject object = JSON.parseObject(line);
 					JSONObject data = object.getJSONObject("data");
 					if (data == null) {
-						log.info("[{}]失败原因:结果中不包含data", id.toUpperCase());
+						log.info("[{}]失败原因:object中不包含data", id.toUpperCase());
 						return customer;
 					}
 					JSONObject info = data.getJSONObject("i");
@@ -306,6 +302,7 @@ public class CustomerService {
 					return customer;
 				}
 			}
+			log.info("[{}]失败原因:结果中不包含object", id.toUpperCase());
 			return customer;
 		} catch (Exception e) {
 			log.info("[{}]失败原因:{}", id.toUpperCase(), e.getMessage());
