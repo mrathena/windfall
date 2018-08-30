@@ -102,7 +102,7 @@ public class CustomerService {
 			}
 
 			// 开100个线程遍历获取信息
-			ExecutorService executor = Executors.newFixedThreadPool(100);
+			ExecutorService executor = Executors.newFixedThreadPool(10);
 			noList.forEach(no -> {
 				Customer tempCustomer = tempCustomerMap.get(no);
 				if (tempCustomer == null || "FAILURE".equals(tempCustomer.getStatus())) {
