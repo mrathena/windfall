@@ -20,6 +20,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
@@ -78,7 +79,7 @@ public class CustomerService {
 			Map<String, Customer> tempCustomerMap = tempCustomerList.stream()
 					.collect(Collectors.toMap(Customer::getNo, customer -> customer));
 			long successCount = tempCustomerList.stream().filter(item -> "SUCCESS".equals(item.getStatus())).count();
-			if (successCount == tempCustomerList.size()) {
+			if (tempCustomerList.size() != 0 && successCount == tempCustomerList.size()) {
 				return "任务执行结束";
 			}
 			progress.setSuccess(successCount);
@@ -253,7 +254,18 @@ public class CustomerService {
 			parameters.put("__EVENTVALIDATION", document.getElementById("__EVENTVALIDATION").val());
 			parameters.put("__VIEWSTATE", document.getElementById("__VIEWSTATE").val());
 			parameters.put("__VIEWSTATEENCRYPTED", document.getElementById("__VIEWSTATEENCRYPTED").val());
+			parameters.put("ctl00$_ContentPlaceHolder$areaCode$textBox", "");
+			parameters.put("ctl00$_ContentPlaceHolder$clientCandidateId$textBox", "");
+			parameters.put("ctl00$_ContentPlaceHolder$confirmationNumber$textBox", "");
+			parameters.put("ctl00$_ContentPlaceHolder$countryCode$textBox", "");
+			parameters.put("ctl00$_ContentPlaceHolder$firstName$textBox", "");
+			parameters.put("ctl00$_ContentPlaceHolder$lastName$textBox", "");
+			parameters.put("ctl00$_ContentPlaceHolder$phoneNumber$textBox", "");
+			parameters.put("ctl00$_ContentPlaceHolder$postalCode$textBox", "");
+			parameters.put("ctl00$_ContentPlaceHolder$prometricTestingId$textBox", "");
+			parameters.put("ctl00$_ContentPlaceHolder$searchByList", "TestingID");
 			parameters.put("ctl00$hdnInput", document.getElementById("hdnInput").val());
+			parameters.put("sortByCriteria", "name");
 			response = OkHttpKit.post(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1").parameters(parameters)
 					.execute2();
 			document = Jsoup.parse(response);
@@ -264,8 +276,13 @@ public class CustomerService {
 			parameters.put("prometricTestingId", id);
 			response = OkHttpKit.post(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1")
 					.json(JSON.toJSONString(parameters)).execute2();
-			log.info(response);
-			String arguement = JSON.parseObject(response).getJSONArray("r").getJSONObject(0).getString("i");
+			JSONArray jsonArray = JSON.parseObject(response).getJSONArray("r");
+			if (jsonArray == null || jsonArray.isEmpty()) {
+				log.info("        [{}]失败原因:arguement不存在", id.toUpperCase());
+				return customer;
+			}
+			String arguement = jsonArray.getJSONObject(0).getString("i");
+
 			// 获取信息
 			url = "https://itswr.prometric.com/SiteScheduler/Default.aspx";
 			parameters.clear();
@@ -282,7 +299,7 @@ public class CustomerService {
 			parameters.put("ctl00$_ContentPlaceHolder$lastName$textBox", "");
 			parameters.put("ctl00$_ContentPlaceHolder$phoneNumber$textBox", "");
 			parameters.put("ctl00$_ContentPlaceHolder$postalCode$textBox", "");
-			parameters.put("ctl00$_ContentPlaceHolder$prometricTestingId$textBox", "cd1000001");
+			parameters.put("ctl00$_ContentPlaceHolder$prometricTestingId$textBox", id);
 			parameters.put("ctl00$_ContentPlaceHolder$searchByList", "TestingID");
 			parameters.put("ctl00$hdnInput", document.getElementById("hdnInput").val());
 			parameters.put("sortByCriteria", "name");
@@ -293,17 +310,18 @@ public class CustomerService {
 			for (int i = 0; i < lines.length; i++) {
 				String line = lines[i];
 				if (line.contains("var a")) {
+					log.info(line);
 					line = line.substring(line.indexOf("{"));
 					line = line.substring(0, line.length() - 1);
 					JSONObject object = JSON.parseObject(line);
 					JSONObject data = object.getJSONObject("data");
 					if (data == null) {
-						log.info("    [{}]失败原因:object中不包含data", id.toUpperCase());
+						log.info("        [{}]失败原因:object中不包含data", id.toUpperCase());
 						return customer;
 					}
 					JSONObject info = data.getJSONObject("i");
 					if (info == null) {
-						log.info("    [{}]失败原因:data中不包含i", id.toUpperCase());
+						log.info("        [{}]失败原因:data中不包含i", id.toUpperCase());
 						return customer;
 					}
 					customer.setStatus("SUCCESS");
@@ -320,11 +338,10 @@ public class CustomerService {
 					return customer;
 				}
 			}
-			log.info("    [{}]失败原因:结果中不包含object", id.toUpperCase());
+			log.info("        [{}]失败原因:结果中不包含object", id.toUpperCase());
 			return customer;
 		} catch (Exception e) {
-			log.info("    [{}]失败原因:{}", id.toUpperCase(), e.getMessage());
-			log.error("", e);
+			log.info("        [{}]失败原因:{}", id.toUpperCase(), e.getMessage());
 			return customer;
 		}
 	}

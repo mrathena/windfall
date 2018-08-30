@@ -25,18 +25,18 @@ public class CustomerController {
 
 	@PostMapping("list")
 	public Object index(DataTables dt, String startNo) {
-		//		log.info("Controller::Request::Parameters::startNo:{},datatables:{}", startNo, dt);
+		log.info("Controller::Request::Parameters::startNo:{},datatables:{}", startNo, dt);
 		DataTables.Result<Customer> page = service.query(dt, startNo);
-		//		log.info("Controller::Response::{}", page);
+		log.info("Controller::Response::{}", page);
 		return page;
 	}
 
 	@PostMapping("crawl")
 	public Object crawl(String startNo, Integer count, HttpServletRequest request) {
-		//		log.info("Controller::Request::Parameters::startNo:{},count:{}", startNo, count);
+		log.info("Controller::Request::Parameters::startNo:{},count:{}", startNo, count);
 		ServletContext context = request.getSession().getServletContext();
 		String resposne = service.crawl(startNo, count, context);
-		//		log.info("Controller::Response::{}", resposne);
+		log.info("Controller::Response::{}", resposne);
 		return resposne;
 	}
 

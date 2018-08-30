@@ -216,6 +216,7 @@ $(document).ready(function() {
 		handle = setInterval("clock()", 1000);
 		$.postJson("customer/crawl", $("#parameter").serializeObject(), true, function(response) {
 			if(response != "任务执行结束") {
+				handle = window.clearInterval(handle);
 				$.msg.error(response);
 			}
 		}, function() {
@@ -228,10 +229,11 @@ function clock() {
 		if(response.status == "当前没有正在执行的任务") {
 			handle = window.clearInterval(handle);
 			$("#progress").hide();
+			$.log("任务进度:100%");
 		} else {
 			var value = (response.success + response.failure) / response.total;
 			$("#progress-bar").css("width", value * 100 + "%").attr("aria-valuenow", value * 10000);
-			$.log(response.status, response.total, response.success, response.failure, value);
+			$.log("任务状态:"+response.status, "任务总数:"+response.total, "成功:"+response.success, "失败:"+response.failure, "任务进度:"+(value*100)+"%");
 		}
 	}, function() {
 		$.msg.error("请稍后重试或联系系统管理员解决", "系统异常");
