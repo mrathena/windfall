@@ -116,7 +116,7 @@
 <script src="assets/mrathena.js"></script>
 <script src="assets/custom.js"></script>
 <script>
-var handle;
+var handles = new Array();
 $(document).ready(function() {
 	// 初始化datatables数据
 	var dt = $('#table').dataTable({
@@ -162,7 +162,11 @@ $(document).ready(function() {
 				render: function(data, type, row, meta) {
             		return data == "SUCCESS" ? "成功" : "失败";
             	}
-            }
+            },
+            {
+				title: "失败原因",
+				data: 'reason'
+			},
         ],
         searching: false,
         ordering: false,
@@ -213,11 +217,20 @@ $(document).ready(function() {
 		var value = 0;
 		$("#progress-bar").css("width", value).attr("aria-valuenow", value);
 		$("#progress").show();
-		handle = setInterval("clock()", 1000);
+		var handle = setInterval("clock()", 1000);
+		handles.push(handle);
 		$.postJson("customer/crawl", $("#parameter").serializeObject(), true, function(response) {
 			if(response != "任务执行结束") {
-				handle = window.clearInterval(handle);
+				for(i = 0, len=handles.length; i < len; i++) {
+					window.clearInterval(handles[i]);
+				}
+				handles = new Array();
 				$.msg.error(response);
+			} else {
+				$.msg.info(response);
+				// 刷新表格
+				dt.fnSettings().ajax.data = $("#condition").serializeObject();
+				dt.api().ajax.reload();
 			}
 		}, function() {
 			$.msg.error("请稍后重试或联系系统管理员解决", "系统异常");
@@ -227,13 +240,16 @@ $(document).ready(function() {
 function clock() {
 	$.postJson("customer/status", null, false, function(response) {
 		if(response.status == "当前没有正在执行的任务") {
-			handle = window.clearInterval(handle);
+			for(i = 0, len=handles.length; i < len; i++) {
+				window.clearInterval(handles[i]);
+			}
+			handles = new Array();
 			$("#progress").hide();
 			$.log("任务进度:100%");
 		} else {
 			var value = (response.success + response.failure) / response.total;
 			$("#progress-bar").css("width", value * 100 + "%").attr("aria-valuenow", value * 10000);
-			$.log("任务状态:"+response.status, "任务总数:"+response.total, "成功:"+response.success, "失败:"+response.failure, "任务进度:"+(value*100)+"%");
+			$.log("状态:"+response.status, "总数:"+response.total, "成功:"+response.success, "失败:"+response.failure, "进度:"+(value*100)+"%");
 		}
 	}, function() {
 		$.msg.error("请稍后重试或联系系统管理员解决", "系统异常");

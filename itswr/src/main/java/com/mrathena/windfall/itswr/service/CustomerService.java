@@ -15,6 +15,7 @@ import javax.servlet.ServletContext;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ import com.mrathena.windfall.itswr.bo.DataTables;
 import com.mrathena.windfall.itswr.bo.Progress;
 import com.mrathena.windfall.itswr.entity.Customer;
 import com.mrathena.windfall.itswr.mapper.CustomerMapper;
+import com.mrathena.windfall.itswr.tool.Kit;
 import com.mrathena.windfall.itswr.tool.OkHttpKit;
 
 import lombok.extern.slf4j.Slf4j;
@@ -75,11 +77,10 @@ public class CustomerService {
 			}
 
 			// 获取从startNo开始总计count个数据中成功的数据
-			List<Customer> tempCustomerList = mapper.selectByStartNoAndCount(startNo, count);
-			Map<String, Customer> tempCustomerMap = tempCustomerList.stream()
-					.collect(Collectors.toMap(Customer::getNo, customer -> customer));
+			List<Customer> tempCustomerList = this.mapper.selectByStartNoAndCount(startNo, count);
+			Map<String, Customer> tempCustomerMap = tempCustomerList.stream().collect(Collectors.toMap(Customer::getNo, customer -> customer));
 			long successCount = tempCustomerList.stream().filter(item -> "SUCCESS".equals(item.getStatus())).count();
-			if (tempCustomerList.size() != 0 && successCount == tempCustomerList.size()) {
+			if (count == successCount && successCount == tempCustomerList.size()) {
 				return "任务执行结束";
 			}
 			progress.setSuccess(successCount);
@@ -93,8 +94,8 @@ public class CustomerService {
 			}
 
 			// 获取itswr账号密码
-			String username = env.getProperty("itswr.username");
-			String password = env.getProperty("itswr.password");
+			String username = this.env.getProperty("itswr.username");
+			String password = this.env.getProperty("itswr.password");
 			// 登录itswr
 			boolean success = authenticate(username, password, context, progress);
 			if (!success) {
@@ -102,9 +103,9 @@ public class CustomerService {
 			}
 
 			// 开100个线程遍历获取信息
-			ExecutorService executor = Executors.newFixedThreadPool(10);
-			noList.forEach(no -> {
-				Customer tempCustomer = tempCustomerMap.get(no);
+			ExecutorService executor = Executors.newFixedThreadPool(3);
+			noList.forEach(cdNo -> {
+				Customer tempCustomer = tempCustomerMap.get(cdNo);
 				if (tempCustomer == null || "FAILURE".equals(tempCustomer.getStatus())) {
 					// 不存在或失败
 					progress.setStatus("执行中");
@@ -114,14 +115,17 @@ public class CustomerService {
 						public void run() {
 
 							long start = System.currentTimeMillis();
-							log.info("开始:[{}]", no);
+							log.info("--------------");
+							log.info("[{}]开始", cdNo);
+							log.info("--------------");
 							// 重试计数器
 							int counter = 1;
-							Customer customer = getCustomer(no);
+							Customer customer = getCustomer(cdNo);
 							while (counter < 10 && "FAILURE".equals(customer.getStatus())) {
-								log.info("    失败:[{}],第{}次重试", no.toUpperCase(), counter);
+								log.info("--------------");
+								log.info("[{}]第{}次重试", cdNo, counter);
 								counter++;
-								customer = getCustomer(no);
+								customer = getCustomer(cdNo);
 							}
 							boolean success;
 							if ("SUCCESS".equals(customer.getStatus())) {
@@ -143,19 +147,25 @@ public class CustomerService {
 								if (tempCustomer == null) {
 									// 不存在
 									mapper.insertSelective(customer);
+								} else {
+									// 已存在且失败
+									customer.setId(tempCustomer.getId());
+									mapper.updateByPrimaryKeySelective(customer);
 								}
 							}
 							context.setAttribute(PROGRESS, progress);
 							long end = System.currentTimeMillis();
-							log.info("结束:{}:[{}]:{}ms", success ? "成功" : "失败", no.toUpperCase(), end - start);
+							log.info("--------------");
+							log.info("[{}]结束:{}:{}ms", cdNo, success ? "成功" : "失败", end - start);
+							log.info("--------------");
 						}
 					});
 				}
 			});
 			executor.shutdown();
 			boolean loop = true;
-			do { //等待所有任务完成
-				loop = !executor.awaitTermination(1, TimeUnit.SECONDS); //阻塞，直到线程池里所有任务结束
+			do { // 等待所有任务完成
+				loop = !executor.awaitTermination(1, TimeUnit.SECONDS); // 阻塞，直到线程池里所有任务结束
 			} while (loop);
 			log.info("任务执行结束");
 			return "任务执行结束";
@@ -177,7 +187,7 @@ public class CustomerService {
 
 	public DataTables.Result<Customer> query(DataTables dt, String startNo) {
 		PageHelper.startPage(dt.getIndex(), dt.getSize());
-		List<Customer> customerList = mapper.selectByStartNo(startNo);
+		List<Customer> customerList = this.mapper.selectByStartNo(startNo);
 		PageInfo<Customer> page = new PageInfo<>(customerList);
 		return new DataTables.Result<>(dt.getDraw(), page.getList(), page.getTotal(), page.getTotal());
 	}
@@ -209,8 +219,7 @@ public class CustomerService {
 			parameters.put("ctl00$_ContentPlaceHolder$login$UserName", username);
 			parameters.put("ctl00$_ContentPlaceHolder$login$Password", password);
 			parameters.put("ctl00$_ContentPlaceHolder$login$LoginButton", "Log In");
-			response = OkHttpKit.post(url).userAgent(UA).parameters(parameters).cookie("AspxAutoDetectCookieSupport=1")
-					.execute2();
+			response = OkHttpKit.post(url).userAgent(UA).parameters(parameters).cookie("AspxAutoDetectCookieSupport=1").execute2();
 			document = Jsoup.parse(response);
 
 			// 选择结点(CN52N)
@@ -225,8 +234,7 @@ public class CustomerService {
 			parameters.put("__VIEWSTATE", document.getElementById("__VIEWSTATE").val());
 			parameters.put("__VIEWSTATEENCRYPTED", document.getElementById("__VIEWSTATEENCRYPTED").val());
 			parameters.put("ctl00$hdnInput", document.getElementById("hdnInput").val());
-			response = OkHttpKit.post(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1").parameters(parameters)
-					.execute2();
+			response = OkHttpKit.post(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1").parameters(parameters).execute2();
 
 			return true;
 		} catch (Exception e) {
@@ -235,25 +243,35 @@ public class CustomerService {
 		}
 	}
 
-	private Customer getCustomer(String id) {
+	private Customer getCustomer(String cdNo) {
 		Customer customer = new Customer();
-		customer.setNo(id);
+		customer.setNo(cdNo);
 		customer.setStatus("FAILURE");
 		try {
 
 			// search页面
+			log.info("[{}]跳转到Search页面", cdNo);
 			String url = "https://itswr.prometric.com/SiteScheduler/Default.aspx";
+			log.info("[{}]地址:{}", cdNo, url);
 			String response = OkHttpKit.get(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1").execute2();
 			Document document = Jsoup.parse(response);
+			if (!documentIsLegal(cdNo, document)) {
+				customer.setReason("页面Document中参数不全");
+				return customer;
+			}
 
+			log.info("-");
 			// 选择结点(CN52N)
+			log.info("[{}]选择节点CN52", cdNo);
 			url = "https://itswr.prometric.com/SiteScheduler/Default.aspx";
+			log.info("[{}]地址:{}", cdNo, url);
 			Map<String, Object> parameters = new HashMap<>();
 			parameters.put("__EVENTARGUMENT", "click-0");
 			parameters.put("__EVENTTARGET", "ctl00$_HeaderPlaceHolder$siteDropdown");
 			parameters.put("__EVENTVALIDATION", document.getElementById("__EVENTVALIDATION").val());
 			parameters.put("__VIEWSTATE", document.getElementById("__VIEWSTATE").val());
 			parameters.put("__VIEWSTATEENCRYPTED", document.getElementById("__VIEWSTATEENCRYPTED").val());
+			parameters.put("ctl00$hdnInput", document.getElementById("hdnInput").val());
 			parameters.put("ctl00$_ContentPlaceHolder$areaCode$textBox", "");
 			parameters.put("ctl00$_ContentPlaceHolder$clientCandidateId$textBox", "");
 			parameters.put("ctl00$_ContentPlaceHolder$confirmationNumber$textBox", "");
@@ -264,33 +282,46 @@ public class CustomerService {
 			parameters.put("ctl00$_ContentPlaceHolder$postalCode$textBox", "");
 			parameters.put("ctl00$_ContentPlaceHolder$prometricTestingId$textBox", "");
 			parameters.put("ctl00$_ContentPlaceHolder$searchByList", "TestingID");
-			parameters.put("ctl00$hdnInput", document.getElementById("hdnInput").val());
 			parameters.put("sortByCriteria", "name");
-			response = OkHttpKit.post(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1").parameters(parameters)
-					.execute2();
+			log.info("[{}]请求:{}", cdNo, parameters);
+			response = OkHttpKit.post(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1").parameters(parameters).execute2();
 			document = Jsoup.parse(response);
+			if (!documentIsLegal(cdNo, document)) {
+				customer.setReason("页面Document中参数不全");
+				return customer;
+			}
 
+			log.info("-");
 			// 获取信息(prometricTestingId对应的key(会变))
+			log.info("[{}]获取用户ID", cdNo);
 			url = "https://itswr.prometric.com/SiteScheduler/Services/SearchService.svc/TestingID/";
+			log.info("[{}]地址:{}", cdNo, url);
 			parameters.clear();
-			parameters.put("prometricTestingId", id);
-			response = OkHttpKit.post(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1")
-					.json(JSON.toJSONString(parameters)).execute2();
+			parameters.put("prometricTestingId", cdNo);
+			log.info("[{}]请求:{}", cdNo, parameters);
+			response = OkHttpKit.post(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1").json(JSON.toJSONString(parameters)).execute2();
+			log.info("[{}]响应:{}", cdNo, response);
 			JSONArray jsonArray = JSON.parseObject(response).getJSONArray("r");
 			if (jsonArray == null || jsonArray.isEmpty()) {
-				log.info("        [{}]失败原因:arguement不存在", id.toUpperCase());
+				log.info("[{}]失败原因:Candidate not found, 这个CD号没有被注册使用", cdNo);
+				customer.setReason("Candidate not found");
+				customer.setStatus("SUCCESS");
 				return customer;
 			}
 			String arguement = jsonArray.getJSONObject(0).getString("i");
 
-			// 获取信息
+			log.info("-");
+			// 获取详细信息
+			log.info("[{}]获取详细信息", cdNo);
 			url = "https://itswr.prometric.com/SiteScheduler/Default.aspx";
+			log.info("[{}]地址:{}", cdNo, url);
 			parameters.clear();
 			parameters.put("__EVENTARGUMENT", arguement);
 			parameters.put("__EVENTTARGET", "ctl00$_ContentPlaceHolder$selectClick");
 			parameters.put("__EVENTVALIDATION", document.getElementById("__EVENTVALIDATION").val());
 			parameters.put("__VIEWSTATE", document.getElementById("__VIEWSTATE").val());
 			parameters.put("__VIEWSTATEENCRYPTED", document.getElementById("__VIEWSTATEENCRYPTED").val());
+			parameters.put("ctl00$hdnInput", document.getElementById("hdnInput").val());
 			parameters.put("ctl00$_ContentPlaceHolder$areaCode$textBox", "");
 			parameters.put("ctl00$_ContentPlaceHolder$clientCandidateId$textBox", "");
 			parameters.put("ctl00$_ContentPlaceHolder$confirmationNumber$textBox", "");
@@ -299,29 +330,30 @@ public class CustomerService {
 			parameters.put("ctl00$_ContentPlaceHolder$lastName$textBox", "");
 			parameters.put("ctl00$_ContentPlaceHolder$phoneNumber$textBox", "");
 			parameters.put("ctl00$_ContentPlaceHolder$postalCode$textBox", "");
-			parameters.put("ctl00$_ContentPlaceHolder$prometricTestingId$textBox", id);
+			parameters.put("ctl00$_ContentPlaceHolder$prometricTestingId$textBox", cdNo);
 			parameters.put("ctl00$_ContentPlaceHolder$searchByList", "TestingID");
-			parameters.put("ctl00$hdnInput", document.getElementById("hdnInput").val());
 			parameters.put("sortByCriteria", "name");
-			response = OkHttpKit.post(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1").parameters(parameters)
-					.execute2();
+			log.info("[{}]请求:{}", cdNo, parameters);
+			response = OkHttpKit.post(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1").parameters(parameters).execute2();
 
 			String[] lines = response.split(System.lineSeparator());
 			for (int i = 0; i < lines.length; i++) {
 				String line = lines[i];
+				log.info("[{}]响应:{}", cdNo, line);
 				if (line.contains("var a")) {
-					log.info(line);
 					line = line.substring(line.indexOf("{"));
 					line = line.substring(0, line.length() - 1);
 					JSONObject object = JSON.parseObject(line);
 					JSONObject data = object.getJSONObject("data");
 					if (data == null) {
-						log.info("        [{}]失败原因:object中不包含data", id.toUpperCase());
+						log.info("[{}]失败原因:object中不包含data", cdNo);
+						customer.setReason("object中不包含data");
 						return customer;
 					}
 					JSONObject info = data.getJSONObject("i");
 					if (info == null) {
-						log.info("        [{}]失败原因:data中不包含i", id.toUpperCase());
+						log.info("[{}]失败原因:data中不包含i", cdNo);
+						customer.setReason("data中不包含i");
 						return customer;
 					}
 					customer.setStatus("SUCCESS");
@@ -338,12 +370,26 @@ public class CustomerService {
 					return customer;
 				}
 			}
-			log.info("        [{}]失败原因:结果中不包含object", id.toUpperCase());
+			log.info("[{}]失败原因:结果中不包含object", cdNo);
+			customer.setReason("结果中不包含object");
 			return customer;
 		} catch (Exception e) {
-			log.info("        [{}]失败原因:{}", id.toUpperCase(), e.getMessage());
+			log.info("[{}]失败原因:{}", cdNo, e.getMessage());
+			customer.setReason(e.getMessage());
 			return customer;
 		}
+	}
+
+	private boolean documentIsLegal(String cdNo, Document document) {
+		Element EVENTVALIDATION = document.getElementById("__EVENTVALIDATION");
+		Element VIEWSTATE = document.getElementById("__VIEWSTATE");
+		Element VIEWSTATEENCRYPTED = document.getElementById("__VIEWSTATEENCRYPTED");
+		Element hdnInput = document.getElementById("hdnInput");
+		if (Kit.isAnyNull(EVENTVALIDATION, VIEWSTATE, VIEWSTATEENCRYPTED, hdnInput)) {
+			log.info("[{}]页面必传参数有Null", cdNo);
+			return false;
+		}
+		return true;
 	}
 
 }

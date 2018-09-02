@@ -3,7 +3,6 @@ package com.mrathena.windfall.itswr.tool;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,7 +79,7 @@ public class OkHttpKit {
 						public void saveFromResponse(HttpUrl url, List<Cookie> cookies) {
 							List<Cookie> tempCookieList = new ArrayList<>(cookies);
 							// List转Map
-							Map<String, Cookie> tempCookieMap = new HashMap<>();
+							Map<String, Cookie> tempCookieMap = new LinkedHashMap<>();
 							tempCookieList.forEach(cookie -> {
 								tempCookieMap.put(cookie.name(), cookie);
 							});
@@ -107,7 +106,7 @@ public class OkHttpKit {
 							return cookieList;
 						}
 					});
-					//					clientBuilder.proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress("localhost", 1080)));
+					// clientBuilder.proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress("localhost", 1080)));
 					instance = clientBuilder.build();
 				}
 			}
@@ -365,22 +364,19 @@ public class OkHttpKit {
 
 	private void checkFileMapAddOperation() {
 		if (this.fileList != null || this.fileListMap != null || this.json != null) {
-			throw new UnsupportedOperationException(
-					"Unsupport current operation when you had choosed Other request body");
+			throw new UnsupportedOperationException("Unsupport current operation when you had choosed Other request body");
 		}
 	}
 
 	private void checkFileListAddOperation() {
 		if (this.fileMap != null || this.fileListMap != null || this.json != null) {
-			throw new UnsupportedOperationException(
-					"Unsupport current operation when you had choosed Other request body");
+			throw new UnsupportedOperationException("Unsupport current operation when you had choosed Other request body");
 		}
 	}
 
 	private void checkFileListMapAddOperation() {
 		if (this.fileMap != null || this.fileList != null || this.json != null) {
-			throw new UnsupportedOperationException(
-					"Unsupport current operation when you had choosed Other request body");
+			throw new UnsupportedOperationException("Unsupport current operation when you had choosed Other request body");
 		}
 	}
 

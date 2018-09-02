@@ -9,38 +9,42 @@
 		<result column="number" jdbcType="VARCHAR" property="number" />
 		<result column="number2" jdbcType="VARCHAR" property="number2" />
 		<result column="status" jdbcType="VARCHAR" property="status" />
+		<result column="reason" jdbcType="VARCHAR" property="reason" />
 	</resultMap>
 	<sql id="Base_Column_List">
-		id, no, name, email, number, number2, status
+		id, `no`, `name`, email, `number`, number2, `status`, reason
 	</sql>
 	<insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.mrathena.windfall.itswr.entity.Customer" useGeneratedKeys="true">
-		insert into itswr_customer (no, name, email, 
-			number, number2, status
-			)
+		insert into itswr_customer (`no`, `name`, email, 
+			`number`, number2, `status`, 
+			reason)
 		values (#{no,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, #{email,jdbcType=VARCHAR}, 
-			#{number,jdbcType=VARCHAR}, #{number2,jdbcType=VARCHAR}, #{status,jdbcType=VARCHAR}
-			)
+			#{number,jdbcType=VARCHAR}, #{number2,jdbcType=VARCHAR}, #{status,jdbcType=VARCHAR}, 
+			#{reason,jdbcType=VARCHAR})
 	</insert>
 	<insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="com.mrathena.windfall.itswr.entity.Customer" useGeneratedKeys="true">
 		insert into itswr_customer
 		<trim prefix="(" suffix=")" suffixOverrides=",">
 			<if test="no != null">
-				no,
+				`no`,
 			</if>
 			<if test="name != null">
-				name,
+				`name`,
 			</if>
 			<if test="email != null">
 				email,
 			</if>
 			<if test="number != null">
-				number,
+				`number`,
 			</if>
 			<if test="number2 != null">
 				number2,
 			</if>
 			<if test="status != null">
-				status,
+				`status`,
+			</if>
+			<if test="reason != null">
+				reason,
 			</if>
 		</trim>
 		<trim prefix="values (" suffix=")" suffixOverrides=",">
@@ -62,38 +66,45 @@
 			<if test="status != null">
 				#{status,jdbcType=VARCHAR},
 			</if>
+			<if test="reason != null">
+				#{reason,jdbcType=VARCHAR},
+			</if>
 		</trim>
 	</insert>
 	<update id="updateByPrimaryKey" parameterType="com.mrathena.windfall.itswr.entity.Customer">
 		update itswr_customer
-		set no = #{no,jdbcType=VARCHAR},
-			name = #{name,jdbcType=VARCHAR},
+		set `no` = #{no,jdbcType=VARCHAR},
+			`name` = #{name,jdbcType=VARCHAR},
 			email = #{email,jdbcType=VARCHAR},
-			number = #{number,jdbcType=VARCHAR},
+			`number` = #{number,jdbcType=VARCHAR},
 			number2 = #{number2,jdbcType=VARCHAR},
-			status = #{status,jdbcType=VARCHAR}
+			`status` = #{status,jdbcType=VARCHAR},
+			reason = #{reason,jdbcType=VARCHAR}
 		where id = #{id,jdbcType=BIGINT}
 	</update>
 	<update id="updateByPrimaryKeySelective" parameterType="com.mrathena.windfall.itswr.entity.Customer">
 		update itswr_customer
 		<set>
 			<if test="no != null">
-				no = #{no,jdbcType=VARCHAR},
+				`no` = #{no,jdbcType=VARCHAR},
 			</if>
 			<if test="name != null">
-				name = #{name,jdbcType=VARCHAR},
+				`name` = #{name,jdbcType=VARCHAR},
 			</if>
 			<if test="email != null">
 				email = #{email,jdbcType=VARCHAR},
 			</if>
 			<if test="number != null">
-				number = #{number,jdbcType=VARCHAR},
+				`number` = #{number,jdbcType=VARCHAR},
 			</if>
 			<if test="number2 != null">
 				number2 = #{number2,jdbcType=VARCHAR},
 			</if>
 			<if test="status != null">
-				status = #{status,jdbcType=VARCHAR},
+				`status` = #{status,jdbcType=VARCHAR},
+			</if>
+			<if test="reason != null">
+				reason = #{reason,jdbcType=VARCHAR},
 			</if>
 		</set>
 		where id = #{id,jdbcType=BIGINT}
@@ -118,12 +129,6 @@
 			</if>
 		</where>
 		order by no asc
-	</select>
-	<select id="selectByNo" parameterType="java.util.Map" resultMap="BaseResultMap">
-		select 
-		<include refid="Base_Column_List" />
-		from itswr_customer
-		where no = #{no}
 	</select>
 	<select id="selectByStartNoAndCount" parameterType="java.util.Map" resultMap="BaseResultMap">
 		select 
