@@ -30,6 +30,6 @@ public interface CustomerMapper {
 
 	List<Customer> selectByStartNo(@Param("startNo") String startNo);
 
-	List<Customer> selectByStartNoAndCount(@Param("startNo") String startNo, @Param("count") int count);
+	List<Customer> selectByBeginNoAndEndNo(@Param("beginNo") String beginNo, @Param("endNo") String endNo);
 
 }

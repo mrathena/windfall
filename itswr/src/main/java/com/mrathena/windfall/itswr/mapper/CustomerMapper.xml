@@ -130,11 +130,10 @@
 		</where>
 		order by no asc
 	</select>
-	<select id="selectByStartNoAndCount" parameterType="java.util.Map" resultMap="BaseResultMap">
+	<select id="selectByBeginNoAndEndNo" parameterType="java.util.Map" resultMap="BaseResultMap">
 		select 
 		<include refid="Base_Column_List" />
 		from itswr_customer
-		where no &gt;= #{startNo}
-		limit #{count}
+		where no &gt;= #{beginNo} and no &lt;= #{endNo}
 	</select>
 </mapper>

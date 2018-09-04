@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.mrathena.windfall.itswr.bo.DataTables;
 import com.mrathena.windfall.itswr.bo.Progress;
 import com.mrathena.windfall.itswr.entity.Customer;
-import com.mrathena.windfall.itswr.service.CustomerService2;
+import com.mrathena.windfall.itswr.service.CustomerService;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -21,7 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 public class CustomerController {
 
 	@Autowired
-	private CustomerService2 service;
+	private CustomerService service;
 
 	@PostMapping("list")
 	public Object index(DataTables dt, String startNo) {

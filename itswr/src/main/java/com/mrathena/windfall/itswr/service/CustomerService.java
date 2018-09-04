@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -18,6 +19,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
+import org.springframework.stereotype.Service;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
@@ -28,12 +30,14 @@ import com.mrathena.windfall.itswr.bo.DataTables;
 import com.mrathena.windfall.itswr.bo.Progress;
 import com.mrathena.windfall.itswr.entity.Customer;
 import com.mrathena.windfall.itswr.mapper.CustomerMapper;
+import com.mrathena.windfall.itswr.tool.Http;
 import com.mrathena.windfall.itswr.tool.Kit;
 import com.mrathena.windfall.itswr.tool.OkHttpKit;
 
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
+@Service
 public class CustomerService {
 
 	private static final String PROGRESS = "PROGRESS";
@@ -74,19 +78,23 @@ public class CustomerService {
 				return "起始CD号的格式应该为[CDxxxxxxx]";
 			}
 
-			// 获取从startNo开始总计count个数据中成功的数据
-			List<Customer> tempCustomerList = this.mapper.selectByStartNoAndCount(startNo, count);
+			int start = Integer.parseInt(startNo.substring(2));
+			int end = start + count - 1;
+			String endNo = CD + end;
+			log.info("BeginNo:{}, EndNo:{}", startNo, endNo);
+
+			// 获取从beginNo开始到endNo的数据
+			List<Customer> tempCustomerList = this.mapper.selectByBeginNoAndEndNo(startNo, endNo);
 			Map<String, Customer> tempCustomerMap = tempCustomerList.stream().collect(Collectors.toMap(Customer::getNo, customer -> customer));
 			long successCount = tempCustomerList.stream().filter(item -> "SUCCESS".equals(item.getStatus())).count();
-			if (count == successCount && successCount == tempCustomerList.size()) {
+			if (count == tempCustomerList.size() && count == successCount) {
 				return "任务执行结束";
 			}
 			progress.setSuccess(successCount);
 			context.setAttribute(PROGRESS, progress);
 
-			// 生成no集合
+			// 生成cdNo集合
 			List<String> noList = new ArrayList<>(count);
-			int start = Integer.parseInt(startNo.substring(2));
 			for (int i = 0; i < count; i++) {
 				noList.add(CD + (start + i));
 			}
@@ -100,8 +108,94 @@ public class CustomerService {
 				return "Itswr网站鉴权失败";
 			}
 
+			log.info("请求工具初始化开始");
+			// 初始化请求工具
+			int threads = 100;
+			List<Http> https = new ArrayList<>(threads);
+			int circle = count > threads ? threads : count;
+			for (int i = 1; i <= circle; i++) {
+				https.add(Http.getInstance());
+			}
+
+			// 请求Headers
+			Map<String, String> headers = new HashMap<>();
+			headers.put("AspxAutoDetectCookieSupport", "1");
+			headers.put("User-Agent", UA);
+
+			try {
+				// 开100个线程给Http授权
+				AtomicInteger counter = new AtomicInteger(0);
+				ExecutorService executor = Executors.newFixedThreadPool(threads);
+				https.forEach(item -> {
+					executor.submit(new Runnable() {
+						@Override
+						public void run() {
+							// 请求参数
+							Map<String, Object> parameters = new HashMap<>();
+
+							log.info("获取登录参数");
+							// 获取登录参数
+							String url = "https://itswr.prometric.com/login.aspx";
+							String response = null;
+							try {
+								response = item.get(url, headers, null);
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+							Document document = Jsoup.parse(response);
+
+							log.info("登录");
+							// 登录(获取SecurityServices)
+							url = "https://itswr.prometric.com/login.aspx";
+							parameters.put("__EVENTTARGET", "");
+							parameters.put("__EVENTARGUMENT", "");
+							parameters.put("__EVENTVALIDATION", document.getElementById("__EVENTVALIDATION").val());
+							parameters.put("__VIEWSTATE", document.getElementById("__VIEWSTATE").val());
+							parameters.put("__VIEWSTATEENCRYPTED", document.getElementById("__VIEWSTATEENCRYPTED").val());
+							parameters.put("hdnInput", document.getElementById("hdnInput").val());
+							parameters.put("ctl00$_ContentPlaceHolder$login$UserName", username);
+							parameters.put("ctl00$_ContentPlaceHolder$login$Password", password);
+							parameters.put("ctl00$_ContentPlaceHolder$login$LoginButton", "Log In");
+							try {
+								response = item.post(url, headers, parameters);
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+							document = Jsoup.parse(response);
+
+							log.info("选择结点");
+							// 选择结点(CN52N)
+							url = "https://itswr.prometric.com/SiteScheduler/Default.aspx";
+							parameters.clear();
+							parameters.put("__EVENTARGUMENT", "click-0");
+							parameters.put("__EVENTTARGET", "ctl00$_HeaderPlaceHolder$siteDropdown");
+							parameters.put("__EVENTVALIDATION", document.getElementById("__EVENTVALIDATION").val());
+							parameters.put("__VIEWSTATE", document.getElementById("__VIEWSTATE").val());
+							parameters.put("__VIEWSTATEENCRYPTED", document.getElementById("__VIEWSTATEENCRYPTED").val());
+							parameters.put("ctl00$hdnInput", document.getElementById("hdnInput").val());
+							try {
+								response = item.post(url, headers, parameters);
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+
+							log.info("成功");
+							counter.incrementAndGet();
+						}
+					});
+				});
+				executor.shutdown();
+				boolean loop = true;
+				do { // 等待所有任务完成
+					loop = !executor.awaitTermination(1, TimeUnit.SECONDS); // 阻塞，直到线程池里所有任务结束
+				} while (loop);
+				log.info("请求工具初始化结束,{}/{}", counter.get(), count);
+			} catch (Exception e) {
+				log.error("", e);
+			}
+
 			// 开100个线程遍历获取信息
-			ExecutorService executor = Executors.newFixedThreadPool(3);
+			ExecutorService executor = Executors.newFixedThreadPool(threads);
 			noList.forEach(cdNo -> {
 				Customer tempCustomer = tempCustomerMap.get(cdNo);
 				if (tempCustomer == null || "FAILURE".equals(tempCustomer.getStatus())) {
@@ -112,18 +206,22 @@ public class CustomerService {
 						@Override
 						public void run() {
 
+							String threadName = Thread.currentThread().getName();
+							int index = Integer.parseInt(threadName.substring(threadName.lastIndexOf("-") + 1)) - 1;
+							Http http = https.get(index);
+
 							long start = System.currentTimeMillis();
 							log.info("--------------");
 							log.info("[{}]开始", cdNo);
 							log.info("--------------");
 							// 重试计数器
 							int counter = 1;
-							Customer customer = getCustomer(cdNo);
+							Customer customer = getCustomer(http, headers, cdNo);
 							while (counter < 10 && "FAILURE".equals(customer.getStatus())) {
 								log.info("--------------");
 								log.info("[{}]第{}次重试", cdNo, counter);
 								counter++;
-								customer = getCustomer(cdNo);
+								customer = getCustomer(http, headers, cdNo);
 							}
 							boolean success;
 							if ("SUCCESS".equals(customer.getStatus())) {
@@ -241,7 +339,7 @@ public class CustomerService {
 		}
 	}
 
-	private Customer getCustomer(String cdNo) {
+	private Customer getCustomer(Http http, Map<String, String> headers, String cdNo) {
 		Customer customer = new Customer();
 		customer.setNo(cdNo);
 		customer.setStatus("FAILURE");
@@ -251,7 +349,7 @@ public class CustomerService {
 			log.info("[{}]跳转到Search页面", cdNo);
 			String url = "https://itswr.prometric.com/SiteScheduler/Default.aspx";
 			log.info("[{}]地址:{}", cdNo, url);
-			String response = OkHttpKit.get(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1").execute2();
+			String response = http.get(url, headers, null);
 			Document document = Jsoup.parse(response);
 			if (!documentIsLegal(cdNo, document)) {
 				customer.setReason("页面Document中参数不全");
@@ -282,7 +380,7 @@ public class CustomerService {
 			parameters.put("ctl00$_ContentPlaceHolder$searchByList", "TestingID");
 			parameters.put("sortByCriteria", "name");
 			log.info("[{}]请求:{}", cdNo, parameters);
-			response = OkHttpKit.post(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1").parameters(parameters).execute2();
+			response = http.post(url, headers, parameters);
 			document = Jsoup.parse(response);
 			if (!documentIsLegal(cdNo, document)) {
 				customer.setReason("页面Document中参数不全");
@@ -297,7 +395,7 @@ public class CustomerService {
 			parameters.clear();
 			parameters.put("prometricTestingId", cdNo);
 			log.info("[{}]请求:{}", cdNo, parameters);
-			response = OkHttpKit.post(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1").json(JSON.toJSONString(parameters)).execute2();
+			response = http.post(url, headers, JSON.toJSONString(parameters));
 			log.info("[{}]响应:{}", cdNo, response);
 			JSONArray jsonArray = JSON.parseObject(response).getJSONArray("r");
 			if (jsonArray == null || jsonArray.isEmpty()) {
@@ -332,7 +430,7 @@ public class CustomerService {
 			parameters.put("ctl00$_ContentPlaceHolder$searchByList", "TestingID");
 			parameters.put("sortByCriteria", "name");
 			log.info("[{}]请求:{}", cdNo, parameters);
-			response = OkHttpKit.post(url).userAgent(UA).cookie("AspxAutoDetectCookieSupport=1").parameters(parameters).execute2();
+			response = http.post(url, headers, parameters);
 
 			String[] lines = response.split(System.lineSeparator());
 			for (int i = 0; i < lines.length; i++) {
