@@ -89,6 +89,7 @@ public class TimerTask {
 					headers.put(BusinessConstant.COOKIE, BusinessConstant.COOKIE_VALUE);
 
 					// Http对象集合
+					@SuppressWarnings("unchecked")
 					List<Http> https = cache.get(BusinessConstant.HTTPS, List.class);
 
 					// 计数器
