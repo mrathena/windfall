@@ -51,7 +51,6 @@ public class TimerTask {
 						long success = initStatus.getSuccess();
 						long failure = initStatus.getFailure();
 						log.info("初始化任务进度, 总数:{}, 第一步成功:{}, 第二步成功:{}, 最终成功:{}, 失败:{}", total, first, second, success, failure);
-
 					}
 				}
 			}
@@ -61,7 +60,7 @@ public class TimerTask {
 	/**
 	 * Http对象保活定时任务
 	 */
-	@Scheduled(cron = "*/10 * * * * ?")
+	@Scheduled(cron = "* * * * * ?")
 	public void httpLiveTimerTask() throws Exception {
 		Cache cache = cacheManager.getCache(BusinessConstant.CACHE);
 		if (cache != null) {
