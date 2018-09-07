@@ -139,7 +139,7 @@ public class HttpInitTask implements ApplicationRunner {
 		long second = initStatus.getSecond();
 		long success = initStatus.getSuccess();
 		long failure = initStatus.getFailure();
-		log.info("初始化任务结束, 结果:{}, 总数:{}, 成功:{}, 失败:{}", result, total, success, failure);
+		log.info("初始化任务结束, 结果:{}, 总数:{}, 第一步成功:{}, 第二步成功:{}, 最终成功:{}, 失败:{}", result, total, first, second, success, failure);
 	}
 
 }

@@ -60,7 +60,7 @@ public class TimerTask {
 	/**
 	 * Http对象保活定时任务
 	 */
-	@Scheduled(cron = "* * * * * ?")
+	@Scheduled(cron = "* */1 * * * ?")
 	public void httpLiveTimerTask() throws Exception {
 		Cache cache = cacheManager.getCache(BusinessConstant.CACHE);
 		if (cache != null) {
@@ -83,8 +83,6 @@ public class TimerTask {
 					LiveStatus liveStatus = new LiveStatus(BusinessConstant.THREAD_COUNT);
 					status.live(liveStatus).setStatus(StatusEnum.LIVE.getCode());
 
-					log.info(Constant.EMPTY);
-					log.info("保活任务开始");
 					// 请求Headers
 					Map<String, String> headers = new HashMap<>();
 					headers.put(BusinessConstant.USER_AGENT, BusinessConstant.USER_AGENT_VALUE);
@@ -92,7 +90,6 @@ public class TimerTask {
 
 					// Http对象集合
 					List<Http> https = cache.get(BusinessConstant.HTTPS, List.class);
-					System.out.println(https.size());
 
 					// 计数器
 					AtomicInteger successCounter = new AtomicInteger(Constant.INT_0);
@@ -105,6 +102,7 @@ public class TimerTask {
 							@Override
 							public void run() {
 								try {
+									// 获取搜索页面
 									String url = "https://itswr.prometric.com/SiteScheduler/Default.aspx";
 									String response = http.get(url, headers, null);
 									Document document = Jsoup.parse(response);
@@ -131,7 +129,7 @@ public class TimerTask {
 					long total = liveStatus.getTotal();
 					long success = liveStatus.getSuccess();
 					long failure = liveStatus.getFailure();
-					log.info("保活任务结束, 结果:{}, 总数:{}, 成功:{}, 失败:{}", result, total, success, failure);
+					log.info("定时保活任务, 结果:{}, 总数:{}, 成功:{}, 失败:{}", result, total, success, failure);
 				}
 			}
 		}
