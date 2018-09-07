@@ -3,7 +3,7 @@
 
 	<appender name="console" class="ch.qos.logback.core.ConsoleAppender">
 		<encoder>
-			<Pattern>%message%n</Pattern>
+			<Pattern>[%date{HH:mm:ss}] %message%n</Pattern>
 		</encoder>
 	</appender>
 

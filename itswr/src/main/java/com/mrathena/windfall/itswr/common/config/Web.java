@@ -1,4 +1,4 @@
-package com.mrathena.windfall.itswr.config;
+package com.mrathena.windfall.itswr.common.config;
 
 import java.util.ArrayList;
 import java.util.List;
