@@ -21,7 +21,7 @@ import com.mrathena.windfall.itswr.bo.Status.InitStatus;
 import com.mrathena.windfall.itswr.bo.Status.LiveStatus;
 import com.mrathena.windfall.itswr.common.constant.BusinessConstant;
 import com.mrathena.windfall.itswr.common.constant.Constant;
-import com.mrathena.windfall.itswr.common.enums.StatusEnum;
+import com.mrathena.windfall.itswr.common.enums.SysemStatus;
 import com.mrathena.windfall.itswr.tool.Http;
 
 import lombok.extern.slf4j.Slf4j;
@@ -42,7 +42,7 @@ public class TimerTask {
 		if (cache != null) {
 			Status status = cache.get(BusinessConstant.STATUS, Status.class);
 			if (status != null) {
-				if (StatusEnum.INIT.getCode().equals(status.getStatus())) {
+				if (SysemStatus.INIT.getCode().equals(status.getStatus())) {
 					InitStatus initStatus = status.getInit();
 					if (initStatus != null) {
 						long total = initStatus.getTotal();
@@ -50,7 +50,7 @@ public class TimerTask {
 						long second = initStatus.getSecond();
 						long success = initStatus.getSuccess();
 						long failure = initStatus.getFailure();
-						log.info("初始化任务进度, 总数:{}, 第一步成功:{}, 第二步成功:{}, 最终成功:{}, 失败:{}", total, first, second, success, failure);
+						log.info("初始化任务进度: 总数:{}, 第一步成功:{}, 第二步成功:{}, 最终成功:{}, 失败:{}", total, first, second, success, failure);
 					}
 				}
 			}
@@ -60,28 +60,28 @@ public class TimerTask {
 	/**
 	 * Http对象保活定时任务
 	 */
-	@Scheduled(cron = "* */1 * * * ?")
+	@Scheduled(cron = "0 * * * * ?")
 	public void httpLiveTimerTask() throws Exception {
 		Cache cache = cacheManager.getCache(BusinessConstant.CACHE);
 		if (cache != null) {
 			Status status = cache.get(BusinessConstant.STATUS, Status.class);
 			if (status != null) {
-				if (StatusEnum.INIT.getCode().equals(status.getStatus())) {
+				if (SysemStatus.INIT.getCode().equals(status.getStatus())) {
 					// 当前正在执行初始化任务
 					return;
 				}
-				if (StatusEnum.CRAWL.getCode().equals(status.getStatus())) {
+				if (SysemStatus.CRAWL.getCode().equals(status.getStatus())) {
 					// 当前正在执行爬虫任务
 					return;
 				}
-				if (StatusEnum.LIVE.getCode().equals(status.getStatus())) {
+				if (SysemStatus.LIVE.getCode().equals(status.getStatus())) {
 					// 当前正在执行保活任务
 					return;
 				}
-				if (StatusEnum.IDLE.getCode().equals(status.getStatus())) {
+				if (SysemStatus.IDLE.getCode().equals(status.getStatus())) {
 					// 当前空闲,可执行保活任务
 					LiveStatus liveStatus = new LiveStatus(BusinessConstant.THREAD_COUNT);
-					status.live(liveStatus).setStatus(StatusEnum.LIVE.getCode());
+					status.live(liveStatus).setStatus(SysemStatus.LIVE.getCode());
 
 					// 请求Headers
 					Map<String, String> headers = new HashMap<>();
@@ -124,13 +124,13 @@ public class TimerTask {
 						loop = !executor.awaitTermination(1, TimeUnit.SECONDS); // 阻塞，直到线程池里所有任务结束
 					} while (loop);
 
-					status.setStatus(StatusEnum.IDLE.getCode());
+					status.setStatus(SysemStatus.IDLE.getCode());
 
 					String result = liveStatus.isSuccess() ? "成功" : "失败";
 					long total = liveStatus.getTotal();
 					long success = liveStatus.getSuccess();
 					long failure = liveStatus.getFailure();
-					log.info("定时保活任务, 结果:{}, 总数:{}, 成功:{}, 失败:{}", result, total, success, failure);
+					log.info("定时保活任务: 结果:{}, 总数:{}, 成功:{}, 失败:{}", result, total, success, failure);
 				}
 			}
 		}

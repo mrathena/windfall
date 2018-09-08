@@ -9,7 +9,7 @@ import lombok.Getter;
  */
 @Getter
 @AllArgsConstructor
-public enum StatusEnum {
+public enum SysemStatus {
 
 	INIT("INIT", "OkHttpClient初始化中"),
 	LIVE("LIVE", "OkHttpClient维护中"),
@@ -23,7 +23,7 @@ public enum StatusEnum {
 		if (code == null || code.isEmpty()) {
 			return null;
 		}
-		for (StatusEnum status : StatusEnum.values()) {
+		for (SysemStatus status : SysemStatus.values()) {
 			if (status.getCode().equals(code)) {
 				return status.getDesc();
 			}

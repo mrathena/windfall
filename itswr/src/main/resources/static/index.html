@@ -34,13 +34,22 @@
 							<button type="button" class="btn btn-sm btn-outline btn-info refresh">刷新页面</button>
 							<span class="btn-sm">|</span>
 							<div class="input-group">
-								<input type="text" name="startNo" class="form-control" style="width:120px;" placeholder="起始CD号"/>
+								<select name="perfix" class="form-control">
+									<option value>前缀</option>
+									<option value="CD">CD</option>
+								</select>
 								<span class="input-group-btn">
 									<button type="button" class="btn btn-white clear">×</button>
 								</span>
 							</div>
 							<div class="input-group">
-								<input type="text" name="count" class="form-control" style="width:120px;" placeholder="爬取数量" value="100"/>
+								<input type="text" name="start" class="form-control" style="width:120px;" placeholder="起始号"/>
+								<span class="input-group-btn">
+									<button type="button" class="btn btn-white clear">×</button>
+								</span>
+							</div>
+							<div class="input-group">
+								<input type="text" name="end" class="form-control" style="width:120px;" placeholder="结束号"/>
 								<span class="input-group-btn">
 									<button type="button" class="btn btn-white clear">×</button>
 								</span>
@@ -69,7 +78,7 @@
 							<button type="button" class="btn btn-sm btn-outline btn-info refresh">刷新页面</button>
 							<span class="btn-sm">|</span>
 							<div class="input-group">
-								<input type="text" name="startNo" class="form-control" style="width:120px;" placeholder="起始CD号"/>
+								<input type="text" name="startNo" class="form-control" style="width:120px;" placeholder="起始号(带前缀)"/>
 								<span class="input-group-btn">
 									<button type="button" class="btn btn-white clear">×</button>
 								</span>
@@ -209,17 +218,24 @@ $(document).ready(function() {
 		window.location.reload();
 	})
 	$(document).on("click", "#reset2", function() {
-		$("#parameter input[type=text]").each(function(i) {
+		$("#parameter input[type=text],#parameter select").each(function(i) {
 			$(this).val("");
 		});
 	});
 	$(document).on("click", "#new", function() {
+		var data = $("#parameter").serializeObject();
+		$.log("Parameters", data);
+		if(data.perfix === "" || data.start === "" || data.end === "") {
+			$.msg.warning("需要完善任务参数");
+			return;
+		}
+		
 		var value = 0;
 		$("#progress-bar").css("width", value).attr("aria-valuenow", value);
 		$("#progress").show();
 		var handle = setInterval("clock()", 1000);
 		handles.push(handle);
-		$.postJson("customer/crawl", $("#parameter").serializeObject(), true, function(response) {
+		$.postJson("customer/crawl", data, true, function(response) {
 			if(response != "任务执行结束") {
 				for(i = 0, len=handles.length; i < len; i++) {
 					window.clearInterval(handles[i]);

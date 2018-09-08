@@ -24,7 +24,7 @@ import com.mrathena.windfall.itswr.bo.Status;
 import com.mrathena.windfall.itswr.bo.Status.InitStatus;
 import com.mrathena.windfall.itswr.common.constant.BusinessConstant;
 import com.mrathena.windfall.itswr.common.constant.Constant;
-import com.mrathena.windfall.itswr.common.enums.StatusEnum;
+import com.mrathena.windfall.itswr.common.enums.SysemStatus;
 import com.mrathena.windfall.itswr.tool.Http;
 
 import lombok.extern.slf4j.Slf4j;
@@ -47,7 +47,7 @@ public class HttpInitTask implements ApplicationRunner {
 
 		Cache cache = cacheManager.getCache(BusinessConstant.CACHE);
 		InitStatus initStatus = new InitStatus(BusinessConstant.THREAD_COUNT);
-		Status status = new Status(StatusEnum.INIT.getCode()).init(initStatus);
+		Status status = new Status(SysemStatus.INIT.getCode()).init(initStatus);
 		cache.put(BusinessConstant.STATUS, status);
 
 		// 初始化Http对象集合
@@ -130,7 +130,7 @@ public class HttpInitTask implements ApplicationRunner {
 			loop = !executor.awaitTermination(1, TimeUnit.SECONDS); // 阻塞，直到线程池里所有任务结束
 		} while (loop);
 
-		status.setStatus(StatusEnum.IDLE.getCode());
+		status.setStatus(SysemStatus.IDLE.getCode());
 		cache.put(BusinessConstant.HTTPS, https);
 
 		String result = initStatus.isSuccess() ? "成功" : "失败";
@@ -139,7 +139,7 @@ public class HttpInitTask implements ApplicationRunner {
 		long second = initStatus.getSecond();
 		long success = initStatus.getSuccess();
 		long failure = initStatus.getFailure();
-		log.info("初始化任务结束, 结果:{}, 总数:{}, 第一步成功:{}, 第二步成功:{}, 最终成功:{}, 失败:{}", result, total, first, second, success, failure);
+		log.info("初始化任务结束: 结果:{}, 总数:{}, 第一步成功:{}, 第二步成功:{}, 最终成功:{}, 失败:{}", result, total, first, second, success, failure);
 	}
 
 }

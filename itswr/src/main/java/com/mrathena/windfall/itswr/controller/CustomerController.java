@@ -1,15 +1,12 @@
 package com.mrathena.windfall.itswr.controller;
 
-import javax.servlet.ServletContext;
-import javax.servlet.http.HttpServletRequest;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.mrathena.windfall.itswr.bo.DataTables;
-import com.mrathena.windfall.itswr.bo.Progress;
+import com.mrathena.windfall.itswr.bo.Status;
 import com.mrathena.windfall.itswr.entity.Customer;
 import com.mrathena.windfall.itswr.service.CustomerService;
 
@@ -32,21 +29,19 @@ public class CustomerController {
 	}
 
 	@PostMapping("crawl")
-	public Object crawl(String startNo, Integer count, HttpServletRequest request) {
-		log.info("Controller::Request::Parameters::startNo:{},count:{}", startNo, count);
-		ServletContext context = request.getSession().getServletContext();
-		String resposne = service.crawl(startNo, count, context);
+	public Object crawl(String perfix, Integer start, Integer end) throws Exception {
+		log.info("Controller::Request::Parameters::perfix:{}start:{},end:{}", perfix, start, end);
+		String resposne = service.crawl(perfix, start, end);
 		log.info("Controller::Response::{}", resposne);
 		return resposne;
 	}
 
 	@PostMapping("status")
-	public Object status(HttpServletRequest request) {
+	public Object status() {
 		// log.info("Controller::Request::Parameters::");
-		ServletContext context = request.getSession().getServletContext();
-		Progress progress = service.status(context);
+		Status status = service.status();
 		// log.info("Controller::Response::{}", progress);
-		return progress;
+		return status;
 	}
 
 }

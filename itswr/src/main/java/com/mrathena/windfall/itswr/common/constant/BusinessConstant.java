@@ -5,6 +5,9 @@ public class BusinessConstant {
 	private BusinessConstant() {}
 
 	public static final int THREAD_COUNT = 100;
+	public static final int MAX_CRAWL_COUNT = 10000;
+	public static final int TRY_TIMES = 10;
+
 	public static final String STATUS = "status";
 	public static final String CACHE = "cache";
 	public static final String HTTPS = "https";
