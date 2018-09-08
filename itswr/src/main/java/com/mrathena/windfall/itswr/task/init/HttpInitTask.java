@@ -1,4 +1,4 @@
-package com.mrathena.windfall.itswr.task.initialize;
+package com.mrathena.windfall.itswr.task.init;
 
 import java.util.ArrayList;
 import java.util.HashMap;
