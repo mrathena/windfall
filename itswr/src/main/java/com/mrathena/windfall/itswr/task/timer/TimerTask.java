@@ -93,8 +93,8 @@ public class TimerTask {
 					List<Http> https = cache.get(BusinessConstant.HTTPS, List.class);
 
 					// 计数器
-					AtomicInteger successCounter = new AtomicInteger(Constant.INT_0);
-					AtomicInteger failureCounter = new AtomicInteger(Constant.INT_0);
+					AtomicInteger successCounter = new AtomicInteger(Constant.INTEGER_0);
+					AtomicInteger failureCounter = new AtomicInteger(Constant.INTEGER_0);
 
 					// 线程池
 					ExecutorService executor = Executors.newFixedThreadPool(BusinessConstant.THREAD_COUNT);
@@ -107,9 +107,11 @@ public class TimerTask {
 									String url = "https://itswr.prometric.com/SiteScheduler/Default.aspx";
 									String response = http.get(url, headers, null);
 									Document document = Jsoup.parse(response);
-
-									// 如有必要可加一下结果判断
-									liveStatus.setSuccess(successCounter.incrementAndGet());
+									if (document.getElementById("_ContentPlaceHolder_login_Password") == null) {
+										liveStatus.setSuccess(successCounter.incrementAndGet());
+									} else {
+										liveStatus.setFailure(failureCounter.incrementAndGet());
+									}
 								} catch (Exception e) {
 									log.error(Constant.EMPTY, e);
 									liveStatus.setFailure(failureCounter.incrementAndGet());

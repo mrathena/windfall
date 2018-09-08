@@ -43,13 +43,13 @@
 								</span>
 							</div>
 							<div class="input-group">
-								<input type="text" name="start" class="form-control" style="width:120px;" placeholder="起始号"/>
+								<input type="text" name="start" class="form-control" style="width:120px;" placeholder="起始号" value="1000001"/>
 								<span class="input-group-btn">
 									<button type="button" class="btn btn-white clear">×</button>
 								</span>
 							</div>
 							<div class="input-group">
-								<input type="text" name="end" class="form-control" style="width:120px;" placeholder="结束号"/>
+								<input type="text" name="end" class="form-control" style="width:120px;" placeholder="结束号" value="1010000"/>
 								<span class="input-group-btn">
 									<button type="button" class="btn btn-white clear">×</button>
 								</span>
@@ -224,24 +224,22 @@ $(document).ready(function() {
 	});
 	$(document).on("click", "#new", function() {
 		var data = $("#parameter").serializeObject();
-		$.log("Parameters", data);
 		if(data.perfix === "" || data.start === "" || data.end === "") {
-			$.msg.warning("需要完善任务参数");
+			$.msg.warning("警告:需要完善任务参数");
 			return;
 		}
 		
-		var value = 0;
-		$("#progress-bar").css("width", value).attr("aria-valuenow", value);
+		$("#progress-bar").css("width", value).attr("aria-valuenow", 0);
 		$("#progress").show();
 		var handle = setInterval("clock()", 1000);
 		handles.push(handle);
 		$.postJson("customer/crawl", data, true, function(response) {
-			if(response != "任务执行结束") {
+			if(response.startWith("警告")) {
 				for(i = 0, len=handles.length; i < len; i++) {
 					window.clearInterval(handles[i]);
 				}
 				handles = new Array();
-				$.msg.error(response);
+				$.msg.warning(response);
 			} else {
 				$.msg.info(response);
 				// 刷新表格
@@ -255,17 +253,30 @@ $(document).ready(function() {
 });
 function clock() {
 	$.postJson("customer/status", null, false, function(response) {
-		if(response.status == "当前没有正在执行的任务") {
-			for(i = 0, len=handles.length; i < len; i++) {
+		if(response.status == "IDLE") {
+			for(i = 0, len = handles.length; i < len; i++) {
 				window.clearInterval(handles[i]);
 			}
 			handles = new Array();
 			$("#progress").hide();
 			$.log("任务进度:100%");
 		} else {
-			var value = (response.success + response.failure) / response.total;
+			if(response.status == "INIT") {
+				$("#progress").hide();
+				var status = response.init;
+				$.log("系统正在执行初始化任务, 总数:"+status.total, "成功:"+status.success, "失败:"+status.failure);
+			} else if (response.status == "LIVE") {
+				$("#progress").hide();
+				var status = response.live;
+				$.log("系统正在执行保活任务, 总数:"+status.total, "成功:"+status.success, "失败:"+status.failure);
+			} else if (response.status == "CRAWL") {
+				var status = response.crawl;
+				$("#progress-bar").css("width", value * 100 + "%").attr("aria-valuenow", value * 10000);
+				$.log("系统正在执行爬虫任务, 总数:"+status.total, "成功:"+status.success, "失败:"+status.failure);
+			}
+			var value = (status.success + status.failure) / status.total;
 			$("#progress-bar").css("width", value * 100 + "%").attr("aria-valuenow", value * 10000);
-			$.log("状态:"+response.status, "总数:"+response.total, "成功:"+response.success, "失败:"+response.failure, "进度:"+(value*100)+"%");
+			$.log("状态:"+status.desc, "总数:"+status.total, "成功:"+status.success, "失败:"+status.failure);
 		}
 	}, function() {
 		$.msg.error("请稍后重试或联系系统管理员解决", "系统异常");

@@ -26,6 +26,8 @@ import com.github.pagehelper.PageInfo;
 import com.mrathena.windfall.itswr.bo.DataTables;
 import com.mrathena.windfall.itswr.bo.Status;
 import com.mrathena.windfall.itswr.bo.Status.CrawlStatus;
+import com.mrathena.windfall.itswr.bo.Status.InitStatus;
+import com.mrathena.windfall.itswr.bo.Status.LiveStatus;
 import com.mrathena.windfall.itswr.common.constant.BusinessConstant;
 import com.mrathena.windfall.itswr.common.constant.Constant;
 import com.mrathena.windfall.itswr.common.enums.CrawlResult;
@@ -64,138 +66,148 @@ public class CustomerService {
 			Status status = cache.get(BusinessConstant.STATUS, Status.class);
 			if (status != null) {
 				if (SysemStatus.INIT.getCode().equals(status.getStatus())) {
-					status.setStatus(SysemStatus.IDLE.getCode());
-					return "系统正在执行初始化任务中, 请稍后再试";
+					InitStatus initStatus = status.getInit();
+					long total = initStatus.getTotal();
+					long first = initStatus.getFirst();
+					long second = initStatus.getSecond();
+					long success = initStatus.getSuccess();
+					long failure = initStatus.getFailure();
+					return String.format("系统正在执行初始化任务, 进度: 总数:%d, 第一步成功:%d, 第二步成功:%d, 最终成功:%d, 失败:%d", total, first, second, success, failure);
 				}
 				if (SysemStatus.LIVE.getCode().equals(status.getStatus())) {
-					status.setStatus(SysemStatus.IDLE.getCode());
-					return "系统正在执行保活任务中, 请稍后再试";
+					LiveStatus liveStatus = status.getLive();
+					long total = liveStatus.getTotal();
+					long success = liveStatus.getSuccess();
+					long failure = liveStatus.getFailure();
+					return String.format("系统正在执行保活任务, 进度: 总数:%d, 成功:%d, 失败:%d", total, success, failure);
 				}
 				if (SysemStatus.CRAWL.getCode().equals(status.getStatus())) {
-					status.setStatus(SysemStatus.IDLE.getCode());
-					return "系统正在执行爬取任务中, 请稍后再试";
+					CrawlStatus crawlStatus = status.getCrawl();
+					long total = crawlStatus.getTotal();
+					long success = crawlStatus.getSuccess();
+					long failure = crawlStatus.getFailure();
+					return String.format("系统正在执行爬虫任务: 进度: 总数:%d, 成功:%d, 失败:%d", total, success, failure);
 				}
-			}
+				if (SysemStatus.IDLE.getCode().equals(status.getStatus())) {
 
-			if (SysemStatus.IDLE.getCode().equals(status.getStatus())) {
+					int total = (int) (end - start + 1);
 
-				int total = (int) (end - start + 1);
+					// 当前空闲,可执行保活任务
+					CrawlStatus crawlStatus = new CrawlStatus(total);
+					status.crawl(crawlStatus).setStatus(SysemStatus.CRAWL.getCode());
 
-				// 当前空闲,可执行保活任务
-				CrawlStatus crawlStatus = new CrawlStatus(total);
-				status.crawl(crawlStatus).setStatus(SysemStatus.CRAWL.getCode());
-
-				// 校验参数
-				if (total > BusinessConstant.MAX_CRAWL_COUNT) {
-					status.setStatus(SysemStatus.IDLE.getCode());
-					return "单次最大爬取数量不能超过10000条";
-				}
-
-				String startNo = perfix + start;
-				String endNo = perfix + end;
-
-				// 判断数据是否已执行过且成功
-				List<Customer> tempCustomerList = mapper.selectByBeginNoAndEndNo(startNo, endNo);
-				Map<String, Customer> tempCustomerMap = tempCustomerList.stream().collect(Collectors.toMap(Customer::getNo, customer -> customer));
-				long successCount = tempCustomerList.stream().filter(item -> SUCCESS.equals(item.getStatus())).count();
-				if (total == tempCustomerList.size() && total == successCount) {
-					status.setStatus(SysemStatus.IDLE.getCode());
-					return "任务执行结束";
-				}
-
-				// 生成no集合
-				List<String> noList = new ArrayList<>(total);
-				for (int i = 0; i < total; i++) {
-					noList.add(perfix + (start + i));
-				}
-
-				// 请求Headers
-				Map<String, String> headers = new HashMap<>();
-				headers.put(BusinessConstant.USER_AGENT, BusinessConstant.USER_AGENT_VALUE);
-				headers.put(BusinessConstant.COOKIE, BusinessConstant.COOKIE_VALUE);
-
-				// Http对象集合
-				@SuppressWarnings("unchecked")
-				List<Http> https = cache.get(BusinessConstant.HTTPS, List.class);
-
-				// 计数器
-				AtomicInteger successCounter = new AtomicInteger(Constant.INT_0);
-				AtomicInteger failureCounter = new AtomicInteger(Constant.INT_0);
-
-				// 开100个线程遍历获取信息
-				ExecutorService executor = Executors.newFixedThreadPool(BusinessConstant.THREAD_COUNT);
-				noList.forEach(cdNo -> {
-					Customer tempCustomer = tempCustomerMap.get(cdNo);
-					if (tempCustomer == null || FAILURE.equals(tempCustomer.getStatus())) {
-						// 不存在或失败
-						executor.submit(new Runnable() {
-							@Override
-							public void run() {
-
-								String threadName = Thread.currentThread().getName();
-								int index = Integer.parseInt(threadName.substring(threadName.lastIndexOf("-") + 1)) - 1;
-								Http http = https.get(index);
-
-								long start = System.currentTimeMillis();
-								log.info("--------------");
-								log.info("[{}]开始", cdNo);
-								log.info("--------------");
-								// 重试计数器
-								int counter = 1;
-								Customer customer = getCustomer(http, headers, cdNo);
-								while (counter < BusinessConstant.TRY_TIMES && FAILURE.equals(customer.getStatus())) {
-									log.info("--------------");
-									log.info("[{}]第{}次重试", cdNo, counter);
-									counter++;
-									customer = getCustomer(http, headers, cdNo);
-								}
-								boolean success;
-								if (SUCCESS.equals(customer.getStatus())) {
-									// 执行成功
-									if (tempCustomer == null) {
-										// 不存在
-										mapper.insertSelective(customer);
-									} else {
-										// 已存在但失败
-										customer.setId(tempCustomer.getId());
-										mapper.updateByPrimaryKeySelective(customer);
-									}
-									crawlStatus.setSuccess(successCounter.incrementAndGet());
-									success = true;
-								} else {
-									// 执行失败
-									if (tempCustomer == null) {
-										// 不存在
-										mapper.insertSelective(customer);
-									} else {
-										// 已存在且失败
-										customer.setId(tempCustomer.getId());
-										mapper.updateByPrimaryKeySelective(customer);
-									}
-									crawlStatus.setFailure(failureCounter.incrementAndGet());
-									success = false;
-								}
-								long end = System.currentTimeMillis();
-								log.info("--------------");
-								log.info("[{}]结束:{}:{}ms", cdNo, success ? "成功" : "失败", end - start);
-								log.info("--------------");
-							}
-						});
+					// 校验参数
+					if (total > BusinessConstant.MAX_CRAWL_COUNT) {
+						status.setStatus(SysemStatus.IDLE.getCode());
+						return "警告:单次最大爬取数量不能超过10000条";
 					}
-				});
-				executor.shutdown();
 
-				boolean loop = true;
-				do { // 等待所有任务完成
-					loop = !executor.awaitTermination(1, TimeUnit.SECONDS); // 阻塞，直到线程池里所有任务结束
-				} while (loop);
+					String startNo = perfix + start;
+					String endNo = perfix + end;
 
-				status.setStatus(SysemStatus.IDLE.getCode());
+					// 判断数据是否已执行过且成功
+					List<Customer> tempCustomerList = mapper.selectByBeginNoAndEndNo(startNo, endNo);
+					Map<String, Customer> tempCustomerMap = tempCustomerList.stream().collect(Collectors.toMap(Customer::getNo, customer -> customer));
+					long successCount = tempCustomerList.stream().filter(item -> SUCCESS.equals(item.getStatus())).count();
+					if (total == tempCustomerList.size() && total == successCount) {
+						status.setStatus(SysemStatus.IDLE.getCode());
+						return "任务执行结束";
+					}
 
-				long success = crawlStatus.getSuccess();
-				long failure = crawlStatus.getFailure();
-				log.info("爬虫任务: 总数:{}, 成功:{}, 失败:{}", total, success, failure);
-				return String.format("爬虫任务: 总数:%d, 成功:%d, 失败:%d", total, success, failure);
+					// 生成no集合
+					List<String> noList = new ArrayList<>(total);
+					for (int i = 0; i < total; i++) {
+						noList.add(perfix + (start + i));
+					}
+
+					// 请求Headers
+					Map<String, String> headers = new HashMap<>();
+					headers.put(BusinessConstant.USER_AGENT, BusinessConstant.USER_AGENT_VALUE);
+					headers.put(BusinessConstant.COOKIE, BusinessConstant.COOKIE_VALUE);
+
+					// Http对象集合
+					@SuppressWarnings("unchecked")
+					List<Http> https = cache.get(BusinessConstant.HTTPS, List.class);
+
+					// 计数器
+					AtomicInteger successCounter = new AtomicInteger(Constant.INTEGER_0);
+					AtomicInteger failureCounter = new AtomicInteger(Constant.INTEGER_0);
+
+					// 开100个线程遍历获取信息
+					ExecutorService executor = Executors.newFixedThreadPool(BusinessConstant.THREAD_COUNT);
+					noList.forEach(cdNo -> {
+						Customer tempCustomer = tempCustomerMap.get(cdNo);
+						if (tempCustomer == null || FAILURE.equals(tempCustomer.getStatus())) {
+							// 不存在或失败
+							executor.submit(new Runnable() {
+								@Override
+								public void run() {
+
+									String threadName = Thread.currentThread().getName();
+									int index = Integer.parseInt(threadName.substring(threadName.lastIndexOf("-") + 1)) - 1;
+									Http http = https.get(index);
+
+									long start = System.currentTimeMillis();
+									log.info("--------------");
+									log.info("[{}]开始", cdNo);
+									log.info("--------------");
+									// 重试计数器
+									int counter = 1;
+									Customer customer = getCustomer(http, headers, cdNo);
+									while (counter < BusinessConstant.TRY_TIMES && FAILURE.equals(customer.getStatus())) {
+										log.info("--------------");
+										log.info("[{}]第{}次重试", cdNo, counter);
+										counter++;
+										customer = getCustomer(http, headers, cdNo);
+									}
+									boolean success;
+									if (SUCCESS.equals(customer.getStatus())) {
+										// 执行成功
+										if (tempCustomer == null) {
+											// 不存在
+											mapper.insertSelective(customer);
+										} else {
+											// 已存在但失败
+											customer.setId(tempCustomer.getId());
+											mapper.updateByPrimaryKeySelective(customer);
+										}
+										crawlStatus.setSuccess(successCounter.incrementAndGet());
+										success = true;
+									} else {
+										// 执行失败
+										if (tempCustomer == null) {
+											// 不存在
+											mapper.insertSelective(customer);
+										} else {
+											// 已存在且失败
+											customer.setId(tempCustomer.getId());
+											mapper.updateByPrimaryKeySelective(customer);
+										}
+										crawlStatus.setFailure(failureCounter.incrementAndGet());
+										success = false;
+									}
+									long end = System.currentTimeMillis();
+									log.info("--------------");
+									log.info("[{}]结束:{}:{}ms", cdNo, success ? "成功" : "失败", end - start);
+									log.info("--------------");
+								}
+							});
+						}
+					});
+					executor.shutdown();
+
+					boolean loop = true;
+					do { // 等待所有任务完成
+						loop = !executor.awaitTermination(1, TimeUnit.SECONDS); // 阻塞，直到线程池里所有任务结束
+					} while (loop);
+
+					status.setStatus(SysemStatus.IDLE.getCode());
+
+					long success = crawlStatus.getSuccess();
+					long failure = crawlStatus.getFailure();
+					log.info("爬虫任务执行结束: 总数:{}, 成功:{}, 失败:{}", total, success, failure);
+					return String.format("爬虫任务执行结束: 总数:%d, 成功:%d, 失败:%d", total, success, failure);
+				}
 			}
 		}
 		return "喊人吧,这句话出现说明出了系统无法处理的问题";

@@ -11,7 +11,7 @@ public class Constant {
 	public static final String COLON = ":";
 	public static final String VERTICAL = "|";
 
-	public static final int INT_0 = 0;
-	public static final int INT_1 = 1;
+	public static final int INTEGER_0 = 0;
+	public static final int INTEGER_1 = 1;
 
 }

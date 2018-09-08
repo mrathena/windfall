@@ -31,7 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
-@Order(value = Constant.INT_1)
+@Order(value = Constant.INTEGER_1)
 public class HttpInitTask implements ApplicationRunner {
 
 	@Autowired
@@ -67,10 +67,10 @@ public class HttpInitTask implements ApplicationRunner {
 		}
 
 		// 计数器
-		AtomicInteger firstCounter = new AtomicInteger(Constant.INT_0);
-		AtomicInteger secondCounter = new AtomicInteger(Constant.INT_0);
-		AtomicInteger successCounter = new AtomicInteger(Constant.INT_0);
-		AtomicInteger failureCounter = new AtomicInteger(Constant.INT_0);
+		AtomicInteger firstCounter = new AtomicInteger(Constant.INTEGER_0);
+		AtomicInteger secondCounter = new AtomicInteger(Constant.INTEGER_0);
+		AtomicInteger successCounter = new AtomicInteger(Constant.INTEGER_0);
+		AtomicInteger failureCounter = new AtomicInteger(Constant.INTEGER_0);
 
 		// 线程池
 		ExecutorService executor = Executors.newFixedThreadPool(BusinessConstant.THREAD_COUNT);
@@ -86,7 +86,9 @@ public class HttpInitTask implements ApplicationRunner {
 						String url = "https://itswr.prometric.com/login.aspx";
 						String response = http.get(url, headers, null);
 						Document document = Jsoup.parse(response);
-						initStatus.setFirst(firstCounter.incrementAndGet());
+						if (document.getElementById("_ContentPlaceHolder_login_Password") != null) {
+							initStatus.setFirst(firstCounter.incrementAndGet());
+						}
 
 						// 登录(获取SecurityServices)
 						url = "https://itswr.prometric.com/login.aspx";
@@ -101,7 +103,14 @@ public class HttpInitTask implements ApplicationRunner {
 						parameters.put("ctl00$_ContentPlaceHolder$login$LoginButton", "Log In");
 						response = http.post(url, headers, parameters);
 						document = Jsoup.parse(response);
-						initStatus.setSecond(secondCounter.incrementAndGet());
+						if (document.getElementById("_ContentPlaceHolder_login_Password") == null) {
+							initStatus.setSecond(secondCounter.incrementAndGet());
+						} else {
+							// 登录失败, 账号密码不正确
+							log.info("账号密码组合[{}/{}]不正确,系统已强制结束运行,请更新账号密码之后重新启动", username, password);
+							executor.shutdownNow();
+							System.exit(Constant.INTEGER_0);
+						}
 
 						// 选择结点(CN52N)
 						url = "https://itswr.prometric.com/SiteScheduler/Default.aspx";
@@ -114,11 +123,17 @@ public class HttpInitTask implements ApplicationRunner {
 						parameters.put("ctl00$hdnInput", document.getElementById("hdnInput").val());
 						response = http.post(url, headers, parameters);
 						document = Jsoup.parse(response);
-						initStatus.setSuccess(successCounter.incrementAndGet());
-						// 如有必要可加一下结果判断
+						if (document.getElementById("_ContentPlaceHolder_login_Password") == null) {
+							initStatus.setSuccess(successCounter.incrementAndGet());
+						} else {
+							initStatus.setFailure(failureCounter.incrementAndGet());
+						}
 					} catch (Exception e) {
 						log.error(Constant.EMPTY, e);
 						initStatus.setFailure(failureCounter.incrementAndGet());
+						log.error("系统初始化异常,强制结束运行,请重新启动");
+						executor.shutdownNow();
+						System.exit(Constant.INTEGER_0);
 					}
 				}
 			});
