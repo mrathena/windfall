@@ -230,7 +230,7 @@ public class CustomerService {
 				}
 			}
 		}
-		return "喊人吧,这句话出现说明出了系统无法处理的问题";
+		return "喊人吧,出现了系统无法处理的问题";
 
 	}
 
