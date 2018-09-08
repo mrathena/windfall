@@ -102,7 +102,7 @@ public class CustomerService {
 					int length = BusinessConstant.NO_LENGTH - perfix.length();
 					if (start.length() != length || end.length() != length) {
 						status.setStatus(SysemStatus.IDLE.getCode());
-						return "警告:号码长度为9位(包含前缀)";
+						return "警告:号码长度为" + BusinessConstant.NO_LENGTH + "位(包含前缀)";
 					}
 
 					int startInt = Integer.parseInt(start);
@@ -115,7 +115,7 @@ public class CustomerService {
 					int total = endInt - startInt + 1;
 					if (total > BusinessConstant.MAX_CRAWL_COUNT) {
 						status.setStatus(SysemStatus.IDLE.getCode());
-						return "警告:单次最大爬取数量不能超过10000条";
+						return "警告:单次最大爬取数量不能超过" + BusinessConstant.MAX_CRAWL_COUNT + "条";
 					}
 
 					// 当前空闲,可执行保活任务
