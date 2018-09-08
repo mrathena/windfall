@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -59,7 +60,7 @@ public class CustomerService {
 		return new DataTables.Result<>(dt.getDraw(), page.getList(), page.getTotal(), page.getTotal());
 	}
 
-	public String crawl(String perfix, long start, long end) throws Exception {
+	public String crawl(String perfix, String start, String end) throws Exception {
 		// 任务进程校验
 		Cache cache = cacheManager.getCache(BusinessConstant.CACHE);
 		if (cache != null) {
@@ -90,17 +91,36 @@ public class CustomerService {
 				}
 				if (SysemStatus.IDLE.getCode().equals(status.getStatus())) {
 
-					int total = (int) (end - start + 1);
-
-					// 当前空闲,可执行保活任务
-					CrawlStatus crawlStatus = new CrawlStatus(total);
-					status.crawl(crawlStatus).setStatus(SysemStatus.CRAWL.getCode());
+					status.setStatus(SysemStatus.CRAWL.getCode());
 
 					// 校验参数
+					if (StringUtils.isAnyBlank(perfix, start, end)) {
+						status.setStatus(SysemStatus.IDLE.getCode());
+						return "警告:需要完善任务参数";
+					}
+
+					int length = BusinessConstant.NO_LENGTH - perfix.length();
+					if (start.length() != length || end.length() != length) {
+						status.setStatus(SysemStatus.IDLE.getCode());
+						return "警告:号码长度为9位(包含前缀)";
+					}
+
+					int startInt = Integer.parseInt(start);
+					int endInt = Integer.parseInt(end);
+					if (startInt > endInt) {
+						status.setStatus(SysemStatus.IDLE.getCode());
+						return "警告:起始号码不能大于结束号码";
+					}
+
+					int total = endInt - startInt + 1;
 					if (total > BusinessConstant.MAX_CRAWL_COUNT) {
 						status.setStatus(SysemStatus.IDLE.getCode());
 						return "警告:单次最大爬取数量不能超过10000条";
 					}
+
+					// 当前空闲,可执行保活任务
+					CrawlStatus crawlStatus = new CrawlStatus(total);
+					status.crawl(crawlStatus).setStatus(SysemStatus.CRAWL.getCode());
 
 					String startNo = perfix + start;
 					String endNo = perfix + end;

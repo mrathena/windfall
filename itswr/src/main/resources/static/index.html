@@ -37,6 +37,10 @@
 								<select name="perfix" class="form-control">
 									<option value>前缀</option>
 									<option value="CD">CD</option>
+									<option value="SR">SR</option>
+									<option value="SP">SP</option>
+									<option value="GB">GB</option>
+									<option value="I">I</option>
 								</select>
 								<span class="input-group-btn">
 									<button type="button" class="btn btn-white clear">×</button>
@@ -229,7 +233,8 @@ $(document).ready(function() {
 			return;
 		}
 		
-		$("#progress-bar").css("width", value).attr("aria-valuenow", 0);
+		var value = 0;
+		$("#progress-bar").css("width", value).attr("aria-valuenow", value);
 		$("#progress").show();
 		var handle = setInterval("clock()", 1000);
 		handles.push(handle);
@@ -271,12 +276,10 @@ function clock() {
 				$.log("系统正在执行保活任务, 总数:"+status.total, "成功:"+status.success, "失败:"+status.failure);
 			} else if (response.status == "CRAWL") {
 				var status = response.crawl;
+				var value = (status.success + status.failure) / status.total;
 				$("#progress-bar").css("width", value * 100 + "%").attr("aria-valuenow", value * 10000);
 				$.log("系统正在执行爬虫任务, 总数:"+status.total, "成功:"+status.success, "失败:"+status.failure);
 			}
-			var value = (status.success + status.failure) / status.total;
-			$("#progress-bar").css("width", value * 100 + "%").attr("aria-valuenow", value * 10000);
-			$.log("状态:"+status.desc, "总数:"+status.total, "成功:"+status.success, "失败:"+status.failure);
 		}
 	}, function() {
 		$.msg.error("请稍后重试或联系系统管理员解决", "系统异常");

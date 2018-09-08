@@ -107,7 +107,7 @@ public class HttpInitTask implements ApplicationRunner {
 							initStatus.setSecond(secondCounter.incrementAndGet());
 						} else {
 							// 登录失败, 账号密码不正确
-							log.info("账号密码组合[{}/{}]不正确,系统已强制结束运行,请更新账号密码之后重新启动", username, password);
+							log.info("账号密码组合[{}/{}]不正确,系统已强制结束运行,请更新账号密码之后重试", username, password);
 							executor.shutdownNow();
 							System.exit(Constant.INTEGER_0);
 						}
@@ -131,7 +131,7 @@ public class HttpInitTask implements ApplicationRunner {
 					} catch (Exception e) {
 						log.error(Constant.EMPTY, e);
 						initStatus.setFailure(failureCounter.incrementAndGet());
-						log.error("系统初始化异常,强制结束运行,请重新启动");
+						log.error("系统初始化异常,强制结束运行,请重试");
 						executor.shutdownNow();
 						System.exit(Constant.INTEGER_0);
 					}
