@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -36,7 +37,6 @@ import com.mrathena.windfall.itswr.common.enums.SysemStatus;
 import com.mrathena.windfall.itswr.entity.Customer;
 import com.mrathena.windfall.itswr.mapper.CustomerMapper;
 import com.mrathena.windfall.itswr.tool.Http;
-import com.mrathena.windfall.itswr.tool.Kit;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -381,7 +381,7 @@ public class CustomerService {
 		Element VIEWSTATE = document.getElementById("__VIEWSTATE");
 		Element VIEWSTATEENCRYPTED = document.getElementById("__VIEWSTATEENCRYPTED");
 		Element hdnInput = document.getElementById("hdnInput");
-		if (Kit.isAnyNull(EVENTVALIDATION, VIEWSTATE, VIEWSTATEENCRYPTED, hdnInput)) {
+		if (!ObjectUtils.allNotNull(EVENTVALIDATION, VIEWSTATE, VIEWSTATEENCRYPTED, hdnInput)) {
 			log.info("[{}]页面必传参数有Null", cdNo);
 			return false;
 		}
