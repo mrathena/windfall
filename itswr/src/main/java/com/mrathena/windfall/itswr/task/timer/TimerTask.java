@@ -108,7 +108,33 @@ public class TimerTask {
 									String response = http.get(url, headers, null);
 									Document document = Jsoup.parse(response);
 									if (document.getElementById("_ContentPlaceHolder_login_Password") == null) {
-										liveStatus.setSuccess(successCounter.incrementAndGet());
+										// 选择结点(CN52N)
+										url = "https://itswr.prometric.com/SiteScheduler/Default.aspx";
+										Map<String, Object> parameters = new HashMap<>();
+										parameters.put("__EVENTARGUMENT", "click-0");
+										parameters.put("__EVENTTARGET", "ctl00$_HeaderPlaceHolder$siteDropdown");
+										parameters.put("__EVENTVALIDATION", document.getElementById("__EVENTVALIDATION").val());
+										parameters.put("__VIEWSTATE", document.getElementById("__VIEWSTATE").val());
+										parameters.put("__VIEWSTATEENCRYPTED", document.getElementById("__VIEWSTATEENCRYPTED").val());
+										parameters.put("ctl00$hdnInput", document.getElementById("hdnInput").val());
+										parameters.put("ctl00$_ContentPlaceHolder$areaCode$textBox", "");
+										parameters.put("ctl00$_ContentPlaceHolder$clientCandidateId$textBox", "");
+										parameters.put("ctl00$_ContentPlaceHolder$confirmationNumber$textBox", "");
+										parameters.put("ctl00$_ContentPlaceHolder$countryCode$textBox", "");
+										parameters.put("ctl00$_ContentPlaceHolder$firstName$textBox", "");
+										parameters.put("ctl00$_ContentPlaceHolder$lastName$textBox", "");
+										parameters.put("ctl00$_ContentPlaceHolder$phoneNumber$textBox", "");
+										parameters.put("ctl00$_ContentPlaceHolder$postalCode$textBox", "");
+										parameters.put("ctl00$_ContentPlaceHolder$prometricTestingId$textBox", "");
+										parameters.put("ctl00$_ContentPlaceHolder$searchByList", "TestingID");
+										parameters.put("sortByCriteria", "name");
+										response = http.post(url, headers, parameters);
+										document = Jsoup.parse(response);
+										if (document.getElementById("_ContentPlaceHolder_login_Password") == null) {
+											liveStatus.setSuccess(successCounter.incrementAndGet());
+										} else {
+											liveStatus.setFailure(failureCounter.incrementAndGet());
+										}
 									} else {
 										liveStatus.setFailure(failureCounter.incrementAndGet());
 									}
