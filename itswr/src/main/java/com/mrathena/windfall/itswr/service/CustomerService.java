@@ -137,7 +137,7 @@ public class CustomerService {
 					// 生成no集合
 					List<String> noList = new ArrayList<>(total);
 					for (int i = 0; i < total; i++) {
-						noList.add(perfix + (start + i));
+						noList.add(perfix + (Integer.parseInt(start) + i));
 					}
 
 					// 请求Headers
@@ -168,15 +168,15 @@ public class CustomerService {
 									Http http = https.get(index);
 
 									long start = System.currentTimeMillis();
-									log.info("--------------");
-									log.info("[{}]开始", cdNo);
-									log.info("--------------");
+//									log.info("--------------");
+//									log.info("[{}]开始", cdNo);
+//									log.info("--------------");
 									// 重试计数器
 									int counter = 1;
 									Customer customer = getCustomer(http, headers, cdNo);
 									while (counter < BusinessConstant.TRY_TIMES && FAILURE.equals(customer.getStatus())) {
-										log.info("--------------");
-										log.info("[{}]第{}次重试", cdNo, counter);
+//										log.info("--------------");
+//										log.info("[{}]第{}次重试", cdNo, counter);
 										counter++;
 										customer = getCustomer(http, headers, cdNo);
 									}
@@ -207,9 +207,9 @@ public class CustomerService {
 										success = false;
 									}
 									long end = System.currentTimeMillis();
-									log.info("--------------");
+//									log.info("--------------");
 									log.info("[{}]结束:{}:{}ms", cdNo, success ? "成功" : "失败", end - start);
-									log.info("--------------");
+//									log.info("--------------");
 								}
 							});
 						}
@@ -246,9 +246,9 @@ public class CustomerService {
 		try {
 
 			// search页面
-			log.info("[{}]跳转到Search页面", no);
+//			log.info("[{}]跳转到Search页面", no);
 			String url = "https://itswr.prometric.com/SiteScheduler/Default.aspx";
-			log.info("[{}]地址:{}", no, url);
+//			log.info("[{}]地址:{}", no, url);
 			String response = http.get(url, headers, null);
 			Document document = Jsoup.parse(response);
 			if (!documentIsLegal(no, document)) {
@@ -256,11 +256,11 @@ public class CustomerService {
 				return customer;
 			}
 
-			log.info("-");
+//			log.info("-");
 			// 选择结点(CN52N)
-			log.info("[{}]选择节点CN52", no);
+//			log.info("[{}]选择节点CN52", no);
 			url = "https://itswr.prometric.com/SiteScheduler/Default.aspx";
-			log.info("[{}]地址:{}", no, url);
+//			log.info("[{}]地址:{}", no, url);
 			Map<String, Object> parameters = new HashMap<>();
 			parameters.put("__EVENTARGUMENT", "click-0");
 			parameters.put("__EVENTTARGET", "ctl00$_HeaderPlaceHolder$siteDropdown");
@@ -279,7 +279,7 @@ public class CustomerService {
 			parameters.put("ctl00$_ContentPlaceHolder$prometricTestingId$textBox", "");
 			parameters.put("ctl00$_ContentPlaceHolder$searchByList", "TestingID");
 			parameters.put("sortByCriteria", "name");
-			log.info("[{}]请求:{}", no, parameters);
+//			log.info("[{}]请求:{}", no, parameters);
 			response = http.post(url, headers, parameters);
 			document = Jsoup.parse(response);
 			if (!documentIsLegal(no, document)) {
@@ -287,16 +287,16 @@ public class CustomerService {
 				return customer;
 			}
 
-			log.info("-");
+//			log.info("-");
 			// 获取信息(prometricTestingId对应的key(会变))
-			log.info("[{}]获取用户ID", no);
+//			log.info("[{}]获取用户ID", no);
 			url = "https://itswr.prometric.com/SiteScheduler/Services/SearchService.svc/TestingID/";
-			log.info("[{}]地址:{}", no, url);
+//			log.info("[{}]地址:{}", no, url);
 			parameters.clear();
 			parameters.put("prometricTestingId", no);
-			log.info("[{}]请求:{}", no, parameters);
+//			log.info("[{}]请求:{}", no, parameters);
 			response = http.post(url, headers, JSON.toJSONString(parameters));
-			log.info("[{}]响应:{}", no, response);
+//			log.info("[{}]响应:{}", no, response);
 			JSONArray jsonArray = JSON.parseObject(response).getJSONArray("r");
 			if (jsonArray == null || jsonArray.isEmpty()) {
 				log.info("[{}]失败原因:Candidate not found, 这个CD号没有被注册使用", no);
@@ -306,11 +306,11 @@ public class CustomerService {
 			}
 			String arguement = jsonArray.getJSONObject(0).getString("i");
 
-			log.info("-");
+//			log.info("-");
 			// 获取详细信息
-			log.info("[{}]获取详细信息", no);
+//			log.info("[{}]获取详细信息", no);
 			url = "https://itswr.prometric.com/SiteScheduler/Default.aspx";
-			log.info("[{}]地址:{}", no, url);
+//			log.info("[{}]地址:{}", no, url);
 			parameters.clear();
 			parameters.put("__EVENTARGUMENT", arguement);
 			parameters.put("__EVENTTARGET", "ctl00$_ContentPlaceHolder$selectClick");
@@ -329,13 +329,13 @@ public class CustomerService {
 			parameters.put("ctl00$_ContentPlaceHolder$prometricTestingId$textBox", no);
 			parameters.put("ctl00$_ContentPlaceHolder$searchByList", "TestingID");
 			parameters.put("sortByCriteria", "name");
-			log.info("[{}]请求:{}", no, parameters);
+//			log.info("[{}]请求:{}", no, parameters);
 			response = http.post(url, headers, parameters);
 
 			String[] lines = response.split(System.lineSeparator());
 			for (int i = 0; i < lines.length; i++) {
 				String line = lines[i];
-				log.info("[{}]响应:{}", no, line);
+//				log.info("[{}]响应:{}", no, line);
 				if (line.contains("var a")) {
 					line = line.substring(line.indexOf("{"));
 					line = line.substring(0, line.length() - 1);
